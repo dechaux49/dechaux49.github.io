@@ -1,10 +1,13 @@
 [
   {
-    "relation": ["delegate_permission/common.handle_all_urls"],
+    "relation": [
+      "delegate_permission/common.handle_all_urls"
+    ],
     "target": {
       "namespace": "android_app",
       "package_name": "com.dechaux.mineurstellaire",
       "sha256_cert_fingerprints": [
+        "41:84:2D:2C:90:E0:4B:F9:2F:E8:B4:F4:B5:E8:1F:EB:72:CE:50:48:0B:48:6F:7B:E0:9A:23:7F:0C:66:0A:CA",
         "4A:C2:9A:9D:0C:B5:D5:76:C7:8C:70:D3:53:50:93:ED:3F:3B:7F:86:14:3F:18:F8:3A:EA:7B:11:6D:E4:8C:05"
       ]
     }
