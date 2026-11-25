@@ -378,11 +378,16 @@ function drawMonR(m,t){const F=MONF[pIdx()];if(!F)return false;
   const bw=34*k;cx.fillStyle='rgba(0,0,0,.7)';cx.fillRect(q[0]-bw/2,q[1]-h-6*k,bw,5);cx.fillStyle='#ff5050';cx.fillRect(q[0]-bw/2,q[1]-h-6*k,bw*Math.max(0,m.hp/m.max),5);
   if(target===m){cx.strokeStyle='rgba(255,80,80,'+(.5+.4*Math.sin(t*8))+')';cx.lineWidth=2;cx.setLineDash([5,4]);cx.beginPath();cx.ellipse(q[0],q[1],Math.max(20*k,w*.45),9*k,0,0,7);cx.stroke();cx.setLineDash([]);}
   return true;}
+
+function monTele(m,t){try{if(m.dead||typeof player==='undefined')return;const d=Math.hypot(player.x-m.x,player.y-m.y);if(d>.85||m.atk>.45)return;
+  const q=iso(m.x,m.y),k=TW/60,p=1-Math.max(0,m.atk)/.45;
+  cx.save();cx.strokeStyle='rgba(255,60,60,'+(.35+.55*p)+')';cx.lineWidth=2.5*k;cx.beginPath();cx.ellipse(q[0],q[1],(10+12*p)*k,(4.5+5*p)*k,0,0,7);cx.stroke();
+  cx.font='900 '+(14*k)+'px system-ui';cx.textAlign='center';cx.fillStyle='rgba(255,80,80,'+(.5+.5*p)+')';cx.strokeStyle='rgba(0,0,0,.7)';cx.lineWidth=3*k;const y=q[1]-46*k-6*p*k;cx.strokeText('!',q[0],y);cx.fillText('!',q[0],y);cx.restore();}catch(e){}}
 const ORIG={};
 function hook(){
   if(typeof drawAstro!=='function'||typeof drawOre!=='function'){setTimeout(hook,200);return;}
   for(const n of ['drawAstro','drawOre','drawGround','drawRock','drawPlant','drawLumiS','hitOre','breakOre','drawLights','drawShip','drawMon'])ORIG[n]=window[n];
-  window.drawMon=function(m,t){if(READY){try{if(drawMonR(m,t))return;}catch(e){console.error(e);}}return ORIG.drawMon.apply(this,arguments);};
+  window.drawMon=function(m,t){let r;if(READY){try{if(drawMonR(m,t)){monTele(m,t);return;}}catch(e){console.error(e);}}r=ORIG.drawMon.apply(this,arguments);monTele(m,t);return r;};
   window.drawShip=function(t){if(READY&&!(META.set&&META.set.real===false)){try{if(drawShipR(t)!==false)return;}catch(e){console.error(e);}}return ORIG.drawShip.apply(this,arguments);};
   let lastDT=0,lastNow=performance.now();
   window.drawAstro=function(a,t,skinId,scale){if(!READY||(typeof META!=='undefined'&&META.set&&META.set.real===false))return ORIG.drawAstro.apply(this,arguments);try{if(HF_READY&&!(typeof FEM==='function'&&FEM())&&!(META.set&&META.set.fbf===false)){const ok=drawHeroF(a,t,skinId,scale);if(ok!==false)return;}return drawHeroR(a,t,skinId,scale);}catch(e){console.error(e);return ORIG.drawAstro.apply(this,arguments);}};
@@ -401,4 +406,9 @@ function hook(){
   window.drawLights=function(pl,t){const now=performance.now(),dt=clamp((now-lastNow)/1000,0,.05);lastNow=now;try{if(READY)drawFX(dt);}catch(e){}return ORIG.drawLights.apply(this,arguments);};
 }
 hook();
+
+/* ---------- carte galactique : cubes réalistes des planètes ---------- */
+for(let i=0;i<10;i++){const im=new Image();im.src=BASE+'pc_'+i+'.webp';}
+function hookSphere(){if(typeof sphere!=='function'){setTimeout(hookSphere,200);return;}const o=sphere;window.sphere=function(P,unk){try{const i=PLANETS.indexOf(P);if(!unk&&i>=0&&i<10)return 'background:url('+BASE+'pc_'+i+'.webp) center/contain no-repeat;box-shadow:none;border-radius:0;border:0';}catch(e){}return o.apply(this,arguments);};}
+hookSphere();
 })();
