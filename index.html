@@ -1450,7 +1450,7 @@ function frameInner(now){
   if(mode==='run'){tx=player.x;ty=player.y;camSY=.55;}
   else if(mode==='menu'){tx=SHIP.x+Math.cos(T*.05)*3;ty=SHIP.y+Math.sin(T*.05)*3;camSY=.45;}
   else{tx=SHIP.x+.6;ty=SHIP.y+.6;camSY=.27;}
-  const zt=mode==='hub'?1.75:mode==='menu'?1.35:1.1;zoom+=(zt-zoom)*Math.min(1,dt*3);TW=BTW*zoom;TH=TW/2;
+  const zt=mode==='hub'?1.75:mode==='menu'?1.35:(window.ZRUN||1.1);zoom+=(zt-zoom)*Math.min(1,dt*3);TW=BTW*zoom;TH=TW/2;
   cam.x+=(tx-cam.x)*Math.min(1,dt*4);cam.y+=(ty-cam.y)*Math.min(1,dt*4);
   updAmbient(dt);drawSky(T);
   cx.save();if(shake>0){cx.translate(rnd(-shake,shake),rnd(-shake,shake));shake=Math.max(0,shake-dt*25);}
