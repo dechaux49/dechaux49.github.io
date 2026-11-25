@@ -257,8 +257,18 @@ function drawOreR(o,t){
 }
 
 /* ---------- 7. LUMI ---------- */
+const LTC={};
+function lumiTint(col){const base=IM['lumi2'];if(!base||!base.width)return null;if(LTC[col])return LTC[col];
+  try{const c=document.createElement('canvas');c.width=base.width;c.height=base.height;const g=c.getContext('2d');g.drawImage(base,0,0);
+    const [tr,tg,tb]=col.split(',').map(Number);if(Math.abs(tr-127)+Math.abs(tg-246)+Math.abs(tb-255)<30){LTC[col]=base;return base;}
+    const d=g.getImageData(0,0,c.width,c.height),a=d.data;
+    for(let i=0;i<a.length;i+=4){if(a[i+3]<10)continue;const r=a[i],gg=a[i+1],b=a[i+2],mx=Math.max(r,gg,b),mn=Math.min(r,gg,b);
+      if(b>r+25&&mx>60&&(mx-mn)/mx>.25){const L=(r*.3+gg*.59+b*.11)/200,w=Math.min(1,((mx-mn)/mx-.25)/.25);
+        a[i]=r+(Math.min(255,tr*L)-r)*w;a[i+1]=gg+(Math.min(255,tg*L)-gg)*w;a[i+2]=b+(Math.min(255,tb*L)-b)*w;}}
+    g.putImageData(d,0,0);LTC[col]=c;return c;}catch(e){LTC[col]=base;return base;}}
 function drawLumiR(x,y,k,t){
-  const im=IM['lumi2'];if(!im||!im.width)return ORIG.drawLumiS(x,y,k,t);
+  let col0='127,246,255';try{col0=LC();}catch(e){}
+  const im=lumiTint(col0);if(!im||!im.width)return ORIG.drawLumiS(x,y,k,t);
   const h=31*k,w=im.width*h/im.height,kk=h/im.height;let mood='happy';
   try{if(typeof run!=='undefined'&&run&&!run.done&&run.total&&run.t/run.total<.3)mood='worry';if(lumi&&lumi.say>0)mood='joy';}catch(e){}
   const g0=cx.createRadialGradient(x,y,1,x,y,18*k);g0.addColorStop(0,'rgba(120,230,255,.2)');g0.addColorStop(1,'rgba(120,230,255,0)');cx.fillStyle=g0;cx.beginPath();cx.arc(x,y,18*k,0,7);cx.fill();
