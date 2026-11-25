@@ -12,7 +12,7 @@ const BASE=SRC?SRC.replace(/[^\/?#]+([?#].*)?$/,''):'real/';
 const NAMES=['ground2','pick','cactus','v_lumi-blank','n-mfront','n-mback','n2-ffront','n2-fback'];
 for(const p of ['hero-y','hero-z'])for(const q of ['torso','legN','legF','nU','nF','fU','fF'])NAMES.push(p+'-'+q);
 const FAM={roche:['v_rock0','v_rock1','v_rock2','v_rock3'],fer:['v_iron0','v_iron1','v_iron2','v_iron3'],cuivre:['v_copper0','v_copper1','v_copper2'],rubis:['v_ruby0','v_ruby1','v_ruby2']};
-for(const k of ['glace','argent','saphir','cryonite','ambre','amethyste','sporedor','luminite','obsidienne','soufre','magmatite','plasmite'])FAM[k]=['o_'+k];
+for(const k of ['glace','argent','saphir','cryonite','ambre','amethyste','sporedor','luminite','obsidienne','soufre','magmatite','plasmite','ardoise','iridium','ether','neant','sable','perle','nacre','abyssite','tourbe','jade','seve','chlorite'])FAM[k]=['o_'+k];
 for(const k in FAM)NAMES.push(...FAM[k]);
 const IM={};let left=NAMES.length,READY=false,FAILED=false;
 for(const n of NAMES){const i=new Image();i.decoding='async';i.onload=()=>{if(--left===0&&!FAILED){READY=true;try{if(typeof mode!=='undefined'&&mode==='hub'&&typeof renderHub==='function')renderHub();}catch(e){}}};i.onerror=()=>{FAILED=true;};i.src=BASE+n+'.webp';IM[n]=i;}
