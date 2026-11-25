@@ -31,7 +31,8 @@
 
   // Vidéos réellement présentes dans video/ (évite des erreurs 404 inutiles).
   // Suffixe -m = version héros, -f = version héroïne, sans suffixe = pour les deux.
-  const VIDEO_FILES = ['cockpit-m','panic-f','cruise','home-m'];
+  const VIDEO_FILES = [];
+  const SILENT = ['reunion-m'];
   const isFem = () => { try{ return typeof FEM === 'function' && FEM(); }catch(e){ return false; } };
   function vidKeyFor(key){
     const g = isFem() ? '-f' : '-m';
@@ -45,7 +46,7 @@
 
   // --- 1. Préchargement des images HD (secours immédiat) ---
   const IMG = {};
-  for(const k of SCENES){
+  for(const k of []){
     if(k === 'run') continue;
     const im = new Image();
     im.decoding = 'async';
@@ -81,7 +82,8 @@
     v.setAttribute('webkit-playsinline', '');
     v.loop = false;  // le film se joue une fois ; à la fin on garde la dernière image
     v.preload = 'metadata';
-    const rec = { el: v, ok: false, failed: false, triedWebm: false, lastShotT: 999, forcedMute: false };
+    const rec = { el: v, ok: false, failed: false, triedWebm: false, lastShotT: 999, forcedMute: false, silent: SILENT.indexOf(key) >= 0 };
+    if(rec.silent) v.muted = true;
     v.addEventListener('loadeddata', () => { rec.ok = true; rec.failed = false; });
     v.addEventListener('ended', () => { if(activeVidKey === key) duckMusic(false); });
     v.addEventListener('error', () => {
@@ -122,11 +124,12 @@
       if(rec.ok){
         try{ v.currentTime = 0; }catch(e){}
       }
+      try{ v.playbackRate = (VTIME[key] && VTIME[key].rate) || 1; }catch(e){}
     }
     rec.lastShotT = t;
     const vol = vidVolume();
     v.volume = vol;
-    if(!rec.forcedMute) v.muted = (vol <= 0);
+    if(!rec.forcedMute) v.muted = rec.silent || (vol <= 0);
     // ne relance PAS une vidéo terminée (sinon elle reboucle avec le son)
     if(v.paused && !v.ended && v.readyState >= 2){
       const p = v.play();
@@ -142,7 +145,7 @@
 
   // Dès que le joueur touche l'écran, les vidéos coupées faute de geste retrouvent le son
   document.addEventListener('pointerdown', () => {
-    for(const k in VID){ const r = VID[k]; if(r.forcedMute){ r.forcedMute = false; if(vidVolume() > 0) r.el.muted = false; } }
+    for(const k in VID){ const r = VID[k]; if(r.forcedMute){ r.forcedMute = false; if(vidVolume() > 0 && !r.silent) r.el.muted = false; } }
   }, { passive: true });
 
   if(typeof window.setMode === 'function'){
@@ -158,7 +161,133 @@
 
   // Un plan qui a une vraie vidéo dure au moins la durée de la vidéo,
   // et ses sous-titres sont répartis sur toute la vidéo (au prorata de la longueur des répliques)
+
+  // ===== Lecteur de films 100 % vidéo (v40) : enchaînement direct, son d'origine, sous-titres 9 langues =====
+  const OF = { intro: FILMS.intro, ending: FILMS.ending, travel: FILMS.travel };
+  const linesOf = (shots, v) => ((shots.find(x => x.v === v) || {}).lines || []).slice();
+  // clip(fichier, lignes, options) ; ligne = [qui, texte] (réparti sur la vidéo) ou [qui, texte, seconde]
+  const C = (k, lines, o) => Object.assign({ k, a: 0, b: null, lines: lines || [] }, o || {});
+  const T = (who, txt, t) => [who, _t(txt), t];
+  function seqIntro(){
+    const s = OF.intro(), L = v => linesOf(s, v), N = v => L(v).filter(l => l[0] === 'narr').map(l => [l[0], l[1], .3]);
+    const narrW = L('wake').filter(l => l[0] === 'narr').map(l => [l[0], l[1], .3]);
+    const meteor = C('i-meteor', [T('narr', 'Trop tard.', 4.1)]);
+    const crash = C('crash', [T('hero', 'Accroche-toi, LUMI !', 2.2), T('hero', 'On entre dans l’atmosphère !', 3.1)]);
+    if(!isFem()) return [
+      C('home-m', N('home').slice(0, 1).concat([T('hero', 'Je vous aime de tout mon cœur.', 3.9), T('kids', 'On t’aime très fort, papa.', 5.6), T('eve', 'Bon voyage !', 7.7)])),
+      C('cruise', N('cruise')),
+      C('cockpit-m', [T('hero', 'LUMI, prépare la trajectoire d’évitement !', 1.3), T('hero', 'Dis-moi où sont les obstacles !', 3.5), T('hero', 'Calcule vite, LUMI !', 6.1), T('lumi', 'Trajectoire calculée, tout est paré !', 7.7)]),
+      meteor, crash,
+      C('wake-m', [T('lumi', 'Vous êtes vivant ?', 3.7), T('lumi', 'L’ORION est gravement endommagé.', 4.9), T('hero', 'On va le réparer, LUMI.', 6.4), T('hero', 'Je leur ai promis de rentrer.', 8.6)]),
+      C('mine-m', narrW.concat([T('hero', 'C’est parti, LUMI !', 5), T('hero', 'À moi le filon !', 7.5)]))];
+    return [
+      C('cruise', N('cruise')),
+      C('panic-f', [T('hero', 'LUMI, vite, scanne le moteur !', 1.1), T('hero', 'Trouve la panne !', 3.1), T('lumi', 'Diagnostic terminé.', 8.7)]),
+      meteor, crash];
+  }
+  function seqEnding(){
+    if(!isFem()) return [
+      C('e-hyper', [T('narr', 'L’ORION est enfin complet. Cap sur le système solaire.', .2), T('lumi', 'Moteur hyperespace activé ! Accrochez-vous, Capitaine !', 5)]),
+      C('e-earth', [T('lumi', 'Capitaine… regardez devant nous. La Terre.', 1.8), T('hero', 'On a réussi, LUMI… On rentre enfin à la maison.', 6)]),
+      C('e-land', [T('narr', 'Après un long voyage à travers la galaxie, l’ORION touche enfin le sol de la Terre.', .2), T('hero', 'Atterrissage réussi. Je suis revenu, comme promis.', 6)]),
+      C('e-run', [T('lehyss', 'Papa ! C’est Papa !', 5), T('eve', 'Tu es enfin revenu !', 7)]),
+      C('e-hug', [T('hero', 'Je vous avais promis de rentrer. Et regarde, Lehyss… le plus beau caillou de la galaxie.', 2), T('lehyss', 'Tu as tenu ta promesse, Papa !', 7)]),
+      C('beach', [T('narr', 'Les étoiles peuvent attendre.', .2), T('narr', 'Certains trésors ne se trouvent pas dans la galaxie…', 3), T('narr', '…mais ici, sur Terre.', 5)])];
+    return [
+      C('e-hyper', [T('narr', 'L’ORION est enfin complet. Cap sur le système solaire.', .2)], { b: 4.6 }),
+      C('e-land', [T('narr', 'Après un long voyage à travers la galaxie, l’ORION touche enfin le sol de la Terre.', .2)], { b: 6 }),
+      C('beach', [T('narr', 'Les étoiles peuvent attendre.', .2), T('narr', 'Certains trésors ne se trouvent pas dans la galaxie…', 3), T('narr', '…mais ici, sur Terre.', 5)])];
+  }
+  function seqTravel(){
+    const s = OF.travel(), L = v => linesOf(s, v);
+    const launch = C('t-launch', [T('lumi', 'Tous les systèmes sont opérationnels, Capitaine !', .8), T('lumi', 'Décollage imminent !', 3.6)].concat(isFem() ? [] : [T('hero', 'En route vers la prochaine planète.', 5), T('hero', 'On se rapproche de la maison !', 6.4)]), { b: 8.6 });
+    const cruise = C('cruise', L('cruise'), { b: 6.5 });
+    const crash = C('crash', L('entry').concat(L('arrive')), { a: 2.5 });
+    if(isFem()) return [launch, cruise, crash];
+    return [launch, cruise,
+      C('t-alert', [T('lumi', 'Alerte, défaillance moteur !', 0), T('lumi', 'Perte de puissance sur le réacteur principal !', 2), T('hero', 'Je tente un redémarrage d’urgence !', 4), T('hero', 'Accroche-toi, ça va secouer !', 6), T('hero', 'Reste avec moi !', 8)]),
+      crash];
+  }
+  const SEQ = { intro: seqIntro, ending: seqEnding, travel: seqTravel };
+  window.__SEQ = SEQ;
+  // ===== Vidéo de l'ORION en boucle derrière le menu (sans le son) =====
+  let MENUV = null;
+  function menuVideo(on){
+    const menu = document.getElementById('menu'); if(!menu) return;
+    if(on){
+      if(!MENUV){ MENUV = document.createElement('video'); MENUV.muted = true; MENUV.loop = true; MENUV.playsInline = true; MENUV.setAttribute('playsinline','');
+        MENUV.preload = 'auto'; MENUV.src = VID_BASE + 'cruise.mp4';
+        MENUV.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:-1;opacity:0;transition:opacity .8s;pointer-events:none';
+        MENUV.addEventListener('playing', () => { MENUV.style.opacity = .9; });
+        menu.style.isolation = 'isolate'; const ov = document.createElement('div'); ov.style.cssText = 'position:absolute;inset:0;z-index:-1;pointer-events:none;background:linear-gradient(rgba(0,0,0,.15),transparent 35%,rgba(0,0,0,.8))'; menu.insertBefore(ov, menu.firstChild); menu.insertBefore(MENUV, menu.firstChild); }
+      const p = MENUV.play(); if(p && p.catch) p.catch(()=>{});
+    } else if(MENUV){ try{ MENUV.pause(); }catch(e){} }
+  }
+  { const sm = window.setMode; window.setMode = function(m){ const r = sm.apply(this, arguments); try{ menuVideo(m === 'menu'); }catch(e){} return r; }; }
+  setTimeout(() => { try{ if(typeof mode !== 'undefined' && mode === 'menu') menuVideo(true); }catch(e){} }, 300);
+
+  const ORIG_PLAY = window.playCine;
+  let VP = null;
+  window.playCine = function(kind, done, arg){
+    if(!SEQ[kind]) return ORIG_PLAY.apply(this, arguments);
+    try{ AU.init(); AU.resume(); }catch(e){}
+    try{ stopVoice(); }catch(e){}
+    try{ FILMARG = arg || {}; }catch(e){}
+    try{ cine = null; }catch(e){}
+    let list; try{ list = SEQ[kind](); }catch(e){ console.error(e); return ORIG_PLAY.apply(this, arguments); }
+    const box = document.getElementById('cine'), sub = document.getElementById('sub'), skip = document.getElementById('skip');
+    if(VP) VP.finish(true);
+    const mk = () => { const v = document.createElement('video'); v.playsInline = true; v.setAttribute('playsinline', ''); v.preload = 'auto';
+      v.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;object-fit:cover;background:#000;z-index:0;opacity:0'; box.insertBefore(v, box.firstChild); return v; };
+    const els = [mk(), mk()];
+    sub.style.zIndex = 3; skip.style.zIndex = 4; sub.style.opacity = 0; sub.innerHTML = '';
+    let idx = -1, cur = null, nxt = null, forced = false, raf = 0, ended = false, lastLine = -1;
+    const fillT = x => { try{ return fill(x); }catch(e){ return x; } };
+    function times(c, dur){ // répartit les répliques sans heure sur la durée du clip
+      const free = c.lines.filter(l => l[2] === undefined); if(!free.length) return;
+      const span = Math.max(1, dur - .8), tot = free.reduce((n, l) => n + String(l[1]).length + 25, 0); let acc = .3;
+      for(const l of free){ l[2] = acc; acc += span * (String(l[1]).length + 25) / tot; } }
+    function load(el, c){ el.src = VID_BASE + c.k + '.mp4'; el.load(); el._c = c; }
+    function vol(el){ const v = vidVolume(); el.volume = v; el.muted = forced || v <= 0; }
+    function start(el){ const c = el._c; try{ el.currentTime = c.a || 0; }catch(e){} vol(el);
+      const p = el.play(); if(p && p.catch) p.catch(() => { forced = true; el.muted = true; const p2 = el.play(); if(p2 && p2.catch) p2.catch(()=>{}); }); }
+    function next(){
+      idx++; if(idx >= list.length){ VP.finish(); return; }
+      const c = list[idx], el = idx === 0 ? els[0] : nxt;
+      if(idx === 0) load(el, c);
+      const prev = cur; cur = el; lastLine = -1; sub.style.opacity = 0;
+      const show = () => { el.style.opacity = 1; if(prev && prev !== el){ prev.style.opacity = 0; try{ prev.pause(); }catch(e){} } };
+      if(el.readyState >= 2) { start(el); show(); } else { el.addEventListener('loadeddata', function h(){ el.removeEventListener('loadeddata', h); start(el); show(); }); }
+      nxt = els[0] === el ? els[1] : els[0];
+      if(idx + 1 < list.length) load(nxt, list[idx + 1]);
+    }
+    function tick(){
+      if(ended) return; raf = requestAnimationFrame(tick);
+      if(!cur || !cur._c) return; const c = cur._c, dur = (c.b || cur.duration || 10) - (c.a || 0);
+      if(!c._t && cur.duration){ times(c, dur); c._t = 1; }
+      const t = cur.currentTime - (c.a || 0);
+      if(cur.ended || (c.b && cur.currentTime >= c.b - .04) || (cur.duration && cur.currentTime >= cur.duration - .06)){ next(); return; }
+      let li = -1; for(let i = 0; i < c.lines.length; i++) if(c.lines[i][2] !== undefined && t >= c.lines[i][2]) li = i;
+      if(li >= 0 && t > c.lines[li][2] + Math.max(2.4, String(c.lines[li][1]).length / 13 + .8)) li = -1;
+      if(li !== lastLine){ lastLine = li;
+        if(li < 0){ sub.style.opacity = 0; }
+        else { const [w, txt] = c.lines[li], z = (typeof SPK !== 'undefined' && (SPK[w] || SPK.narr)) || { n: '', c: '#fff' }, text = fillT(txt);
+          sub.innerHTML = (z.n ? '<b style="color:' + z.c + ';letter-spacing:1px;font-size:12px;text-transform:uppercase">' + esc(spkName(w)) + '</b><br>' : '') + '<span style="' + (w === 'narr' ? 'font-style:italic;color:#ece6ff' : '') + '">' + esc(text) + '</span>';
+          sub.style.opacity = 1; } }
+    }
+    const onTap = () => { if(forced){ forced = false; if(cur) vol(cur); } };
+    document.addEventListener('pointerdown', onTap, { passive: true });
+    VP = { finish(silent){ if(ended) return; ended = true; cancelAnimationFrame(raf); document.removeEventListener('pointerdown', onTap);
+        for(const e of els){ try{ e.pause(); }catch(x){} e.removeAttribute('src'); try{ e.load(); }catch(x){} e.remove(); }
+        sub.style.opacity = 0; sub.innerHTML = ''; duckMusic(false); VP = null; if(!silent) try{ done && done(); }catch(e){ console.error(e); } } };
+    skip.onclick = () => { try{ AU.click(); }catch(e){} if(VP) VP.finish(); };
+    duckMusic(true);
+    setMode('cine');
+    next(); tick();
+  };
+
   const VTIME = {};
+  window.__CINE = { VID, VTIME, get active(){ return activeVidKey; } };
   if(typeof FILMS === 'object'){
     for(const kind of Object.keys(FILMS)){
       const orig = FILMS[kind];
@@ -166,12 +295,15 @@
         const shots = orig.apply(this, arguments);
         try{
           for(const sh of shots){
-            const k = vidKeyFor(sh.v); const r = k && VID[k];
+            const k = vidKeyFor(sh.vk || sh.v); const r = k && VID[k];
             if(!r || r.failed) continue;
-            const d = r.el.duration > 0 ? r.el.duration : 10; // les films Gemini font 10 s
+            const d = sh.vd || (r.el.duration > 0 ? r.el.duration : 10); // les films Gemini font 10 s
             sh.min = Math.max(sh.min || 0, d + (sh.pre || 0));
             const chars = sh.lines.reduce((n, l) => n + String(l[1] || '').length, 0) || 1;
-            VTIME[k] = { dur: Math.max(1, d - (sh.pre || 0) - 0.35 * sh.lines.length), chars };
+            const full = r.el.duration > 0 ? r.el.duration : 10;
+            const need = (sh.pre || 0) + sh.lines.reduce((n, l) => n + Math.max(1.6, Math.min(8, String(l[1] || '').length / 15 + .8)) + .35, 0) + .8;
+            const rate = Math.max(.7, Math.min(1, full / need));
+            VTIME[k] = { dur: Math.max(1, d - (sh.pre || 0) - 0.35 * sh.lines.length), chars, rate };
           }
         }catch(e){}
         return shots;
@@ -185,7 +317,7 @@
     const origSpeak = window.speak;
     window.speak = function(text, who, onEnd){
       const r = activeVidKey && VID[activeVidKey];
-      if(r && r.ok && !r.el.muted && !r.el.ended){
+      if(r && r.ok && !r.silent && !r.el.ended){
         const vt = VTIME[activeVidKey];
         const ms = vt ? vt.dur * 1000 * text.length / vt.chars : text.length * 55;
         if(onEnd) setTimeout(onEnd, Math.max(1500, ms));
