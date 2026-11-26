@@ -212,6 +212,7 @@ function drawHeroF(a,t,skinId,scale){
   const face=faceO||((a.face||1)>=0?1:-1);
   cx.save();cx.translate(s0[0],s0[1]);cx.globalAlpha*=a.alpha===undefined?1:a.alpha;
   {const hv=clamp(hover/(6*k),0,1),sr=targetH*.27*(1-.3*hv),sg=cx.createRadialGradient(0,0,1,0,0,sr);sg.addColorStop(0,'rgba(0,0,0,'+(.5-.2*hv)+')');sg.addColorStop(1,'rgba(0,0,0,0)');cx.fillStyle=sg;cx.beginPath();cx.ellipse(0,0,sr,sr*.32,0,0,7);cx.fill();}
+  if(isPl&&typeof mode!=='undefined'&&mode==='run'){const rr=targetH*.3,pu=.5+.5*Math.sin(t*3);cx.save();cx.strokeStyle='rgba(111,227,255,'+(.35+.2*pu)+')';cx.lineWidth=Math.max(1.5,targetH*.018);cx.beginPath();cx.ellipse(0,0,rr,rr*.34,0,0,7);cx.stroke();const lg=cx.createRadialGradient(0,-targetH*.45,1,0,-targetH*.45,targetH*.6);lg.addColorStop(0,'rgba(255,240,200,.10)');lg.addColorStop(1,'rgba(255,240,200,0)');cx.fillStyle=lg;cx.beginPath();cx.arc(0,-targetH*.45,targetH*.6,0,7);cx.fill();cx.restore();}
   cx.translate(0,-hover+breath);cx.scale(face*u,u);
   if(jet){for(const dx of [-24,-8]){const fl=moving?1:.55,len=(70+26*Math.sin(t*31+dx))*fl,x0=dx*(st.up?-1:1),y0=-150;
     const fg=cx.createLinearGradient(0,y0,0,y0+len);fg.addColorStop(0,'rgba(190,240,255,.95)');fg.addColorStop(.35,'rgba(90,170,255,.8)');fg.addColorStop(1,'rgba(60,90,255,0)');
