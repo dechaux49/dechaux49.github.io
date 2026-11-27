@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-<meta name="cm-version" content="v49">
+<meta name="cm-version" content="v50">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <meta name="theme-color" content="#05040b">
@@ -363,6 +363,7 @@ textarea{width:100%;min-height:56px;background:var(--bg);color:var(--tx);border:
   <div class="toast" id="toast"></div>
 </div>
 
+<script src="agm-chatgpt.js"></script>
 <script>
 /* v49 axe 5 — journal de diagnostic LOCAL (prototype ChatGPT AX5 adapté) : 50 entrées max, codes + type d'erreur + fichier:ligne de NOTRE code.
    Aucun message brut, aucune donnée du joueur, rien n'est envoyé : le joueur partage lui-même le rapport depuis les réglages. */
@@ -397,7 +398,7 @@ function _t(s){if(LANG==='fr'||typeof s!=='string')return s;const d=I18N[LANG];i
 function setLang(l){try{if(typeof META!=='undefined'){META.lang=l;save();}const m=JSON.parse(localStorage.getItem(MKEY0)||'{}');m.lang=l;localStorage.setItem(MKEY0,JSON.stringify(m));}catch(e){}location.reload();}
 function i18nDom(root){if(LANG==='fr')return;const d=I18N[LANG];const w=document.createTreeWalker(root||document.body,NodeFilter.SHOW_TEXT);let n;while((n=w.nextNode())){if(n.parentNode&&n.parentNode.tagName==='SCRIPT')continue;n.nodeValue=_seg(n.nodeValue,d);}document.querySelectorAll('[placeholder]').forEach(e=>{const v=d[e.getAttribute('placeholder')];if(v)e.setAttribute('placeholder',v);});}
 </script>
-<script id="i18nload">if(LANG!=='fr')document.write('<script src="i18n/'+LANG+'.js?v=823a11d4"><\/script>');</script>
+<script id="i18nload">if(LANG!=='fr')document.write('<script src="i18n/'+LANG+'.js?v=816bfa00"><\/script>');</script>
 <script>
 'use strict';
 /* =====================================================================
@@ -1152,6 +1153,24 @@ function drawTool(tool,k,t,act){
    7. EXPÉDITION (partie de minage)
    ===================================================================== */
 let mode='menu',run=null,player={x:SHIP.x+.9,y:SHIP.y+1.6,face:1,moving:false,swing:0,swingDur:.3},target=null,moveTo=null,holding=false,pending=0,cd=0;
+let miningPointerId=null;
+function resetMiningContact(clearQueued=false){const id=miningPointerId;miningPointerId=null;holding=false;if(clearQueued)pending=0;if(id!==null)try{if(cv.hasPointerCapture(id))cv.releasePointerCapture(id);}catch(_){}}
+/* AGM (ChatGPT) : coordinateur, gardes du moteur et actions différées liées à la sortie en cours.
+   Filet de Claude : si le module n'a pas pu se charger, comportement identique à la v49 sans AGM. */
+let CM_COORD=null,CM_ENGINE=null,CM_FLOOR=null;
+try{if(typeof CM_AGM_LIB==='undefined')throw Error('AGM absent');
+  CM_COORD=CM_AGM_LIB.createCoordinatedAGM({load:async()=>{throw Error('Chargeur d’assets non raccordé')},dispose:()=>false,frame:requestAnimationFrame.bind(window),cancelFrame:cancelAnimationFrame.bind(window)});
+  CM_ENGINE=CM_AGM_LIB.createEngine({coord:CM_COORD});
+  CM_FLOOR=CM_AGM_LIB.createFloorActions({agm:CM_COORD.agm,readRun:()=>run,report:CM_COORD.signal});}
+catch(e){try{DIAG.rec('AGM_OFF',e);}catch(_){}CM_COORD=null;
+  CM_ENGINE={damage:()=>true,image:()=>true,geometry:()=>true,scratch:()=>true,flush:()=>0,snapshot:()=>({})};
+  const live=()=>run&&!run.done;CM_FLOOR={enter:live,leave:()=>true,deferRun:(fn,ms)=>setTimeout(()=>{if(live())fn();},ms),deferFloor:(fn,ms)=>setTimeout(()=>{if(live())fn();},ms),pending:()=>0};}
+/* AGM adaptatif (ChatGPT) : qualité 1 (allégée) ↔ 2 (normale), avec hystérésis : < 38 ips pendant 4 s → allégée ; ≥ 52 ips pendant 8 s → normale.
+   Pas d'entrée thermique (non disponible en TWA). apply() renvoie true si la qualité a bien changé. */
+let CM_ADAPT=null;try{if(CM_COORD)CM_ADAPT=CM_AGM_LIB.createAdaptive({coord:CM_COORD,initial:2,apply:q=>{try{GFX.q=q;GFX.lc=null;resize();window.CM_Q=q;return true;}catch(e){return false;}}});}catch(e){CM_ADAPT=null;try{DIAG.rec('ADAPT_OFF',e);}catch(_){}}
+function cmDeferRun(fn,ms){if(!CM_FLOOR.enter())return false;return CM_FLOOR.deferRun(fn,ms);}
+function cmDeferFloor(fn,ms){if(!CM_FLOOR.enter())return false;return CM_FLOOR.deferFloor(fn,ms);}
+
 let parts=[],floats=[],fxs=[],shake=0;
 let lumi={x:SHIP.x,y:SHIP.y,say:0};
 function nearHull(x,y){const u=(x-SHIP.x)-(y-SHIP.y),v=(x-SHIP.x)+(y-SHIP.y);return ((u-.3)/2.9)**2+((v+.9)/2.1)**2<1;}
@@ -1183,7 +1202,7 @@ function startRun(boss){
   if(boss){run.t+=10;run.total+=10;const top=PL().ores[PL().ores.length-1];const dps=ST.dmg()/ST.cd();const hp=Math.round(Math.max(oreHP(top)*4,dps*6.5));const bx=SHIP.x+4.6,by=SHIP.y+5.8;run.ores=run.ores.filter(o=>Math.hypot(o.x-bx,o.y-by)>2.2);run.boss={x:bx,y:by,type:top,hp,max:hp,seed:.37,shake:0,sc:.2,pure:false,boss:true};run.ores.push(run.boss);run.bt=4;$('bossBox').style.display='';$('bossName').textContent=_t('Cœur de ')+PL().n;}else $('bossBox').style.display='none';
   run.met=(S.runs>=3&&Math.random()<.12+.06*L('meteo'))?rnd(2,Math.max(2.5,run.total-3)):-1;run.meteors=[];lumi.x=player.x-.6;lumi.y=player.y-.6;
   player={x:SHIP.x+.8,y:SHIP.y+2.4,face:1,moving:false,swing:0,swingDur:.3};target=null;
-  if(!boss&&NEXTTP!==null){const d=tpDests()[NEXTTP];if(d){player.x=d.x+.8;player.y=d.y+.8;setTimeout(()=>{fxs.push({type:'ring',x:player.x,y:player.y,r:0,c:'190,120,255',big:1});AU.zap();},100);}NEXTTP=null;}moveTo=null;holding=false;pending=0;cd=0;
+  if(!boss&&NEXTTP!==null){const d=tpDests()[NEXTTP];if(d){player.x=d.x+.8;player.y=d.y+.8;setTimeout(()=>{fxs.push({type:'ring',x:player.x,y:player.y,r:0,c:'190,120,255',big:1});AU.zap();},100);}NEXTTP=null;}moveTo=null;resetMiningContact(true);cd=0;
   setMode('run');$('toolBadge').textContent=curTool().i+' '+curTool().n+' · '+fmt(ST.dmg())+(ST.dmg()<2?_t(' dégât'):_t(' dégâts'));
   run.tuto=S.tuto==='run'&&S.runs<1;run.tutoT=0;if(run.tuto)setTimeout(()=>{if(run&&run.tuto&&!run.done)tutoRunMsg(_t('⛏️ Touche un rocher et garde le doigt appuyé pour frapper. Touche le sol pour marcher. Ton oxygène ne baisse pas tant que tu n’as pas cassé ton premier rocher.'));},700);
   $('hint').textContent=run.tuto?'':S.runs<1?_t('🤖 LUMI : touche un rocher et garde le doigt appuyé pour frapper !'):S.runs<3?_t('🤖 LUMI : touche le sol pour marcher, touche un rocher pour miner.'):'';
@@ -1234,7 +1253,7 @@ function playerHit(alive){alive=alive||run.mons.filter(m=>!m.dead);
   if(run.hp<=0){monDeath();return true;}return false;}
 function updShots(dt){if(!run.shots||!run.shots.length)return;for(const b of run.shots){b.life-=dt;b.x+=b.vx*dt;b.y+=b.vy*dt;if(b.life>0&&Math.hypot(b.x-player.x,b.y-player.y)<.42){b.life=0;fxs.push({type:'ring',x:b.x,y:b.y,r:0,c:'190,90,255'});if(playerHit())return;}}run.shots=run.shots.filter(b=>b.life>0);}
 function drawShots(t){if(!run||!run.shots)return;cx.globalCompositeOperation='lighter';for(const b of run.shots){const q=iso(b.x,b.y,TH*.7),q2=iso(b.x-b.vx*.08,b.y-b.vy*.08,TH*.7),k=TW/60;const g=cx.createRadialGradient(q[0],q[1],1,q[0],q[1],14*k);g.addColorStop(0,'rgba(255,220,255,1)');g.addColorStop(.35,'rgba(200,80,255,.8)');g.addColorStop(1,'rgba(120,0,200,0)');cx.fillStyle=g;cx.beginPath();cx.arc(q[0],q[1],14*k,0,7);cx.fill();cx.strokeStyle='rgba(200,120,255,.6)';cx.lineWidth=5*k;cx.lineCap='round';cx.beginPath();cx.moveTo(q[0],q[1]);cx.lineTo(q2[0],q2[1]);cx.stroke();}cx.globalCompositeOperation='source-over';}
-function monDeath(){run.lost=true;lumiPend('lumi_fail');if(ITR('sac')>=2){for(const k in run.gain)run.gain[k]=Math.floor(run.gain[k]*.25);run.loot.push(_t('🎒 La poche de secours du sac a sauvé 25 % du butin.'));}else for(const k in run.gain)delete run.gain[k];run.stars=0;holding=false;target=null;run.loot.push(_t('💀 Les créatures t’ont mis K.O. : le butin de cette sortie est perdu.'));
+function monDeath(){run.lost=true;lumiPend('lumi_fail');if(ITR('sac')>=2){for(const k in run.gain)run.gain[k]=Math.floor(run.gain[k]*.25);run.loot.push(_t('🎒 La poche de secours du sac a sauvé 25 % du butin.'));}else for(const k in run.gain)delete run.gain[k];run.stars=0;resetMiningContact();target=null;run.loot.push(_t('💀 Les créatures t’ont mis K.O. : le butin de cette sortie est perdu.'));
   const pp=iso(player.x,player.y,TH*2);floats.push({x:pp[0],y:pp[1],t:0,txt:'💀 K.O. !',c:'#ff5050',s:22});GFX.hurt=1;shake=14;run.t=0;run.revive=1;endRun();}
 function drawMon(m,t){const q=iso(m.x,m.y),k=TW/60*1.35*(.35+.65*m.sc),c=h2r(monCol());const bob=Math.sin(t*10+m.seed*9)*2*k,lg=Math.sin(t*14+m.seed*5);
   cx.save();cx.translate(q[0],q[1]);const face=player.x-m.x-(player.y-m.y)>0?1:-1;
@@ -1252,6 +1271,7 @@ function drawMon(m,t){const q=iso(m.x,m.y),k=TW/60*1.35*(.35+.65*m.sc),c=h2r(mon
   if(target===m){cx.strokeStyle='rgba(255,80,80,'+(.5+.4*Math.sin(t*8))+')';cx.lineWidth=2;cx.setLineDash([5,4]);cx.beginPath();cx.ellipse(q[0],q[1],20*k,9*k,0,0,7);cx.stroke();cx.setLineDash([]);}}
 function hitOre(o,dmg,src){
   if(!o||o.dead)return;
+  if(!run||run.done||!CM_ENGINE.damage(o,dmg,ORES[o.type]))return false;
   if(o.hp>=o.max)dmg*=1+.5*L('premier');if(tierOf(o.type)>=2)dmg*=1+.15*L('perce');if(R('coeur3')&&tierOf(o.type)>=2)dmg*=1.25;
   let crit=false;if(Math.random()<ITM('crit')+petB('crit')+.03*PK('p_crit')+modSum('crit')+(TK(7)?.05:0)+.05*L('crit')+(R('coeur2')?.1:0)+.04*RM('labo')){dmg*=3+.5*L('critdmg');crit=true;GFX.flash=Math.max(GFX.flash,.1);questAdd('crit',null,1);}
   o.hp-=dmg;if(o.boss)run.bossHit=.15;if(!o.boss&&o.hp>0&&o.hp<o.max*.25&&L('grace')&&Math.random()<.08*L('grace')){o.hp=0;const pg=iso(o.x,o.y,TH*1.4);floats.push({x:pg[0],y:pg[1],t:0,txt:_t('Coup de grâce !'),c:'#ffb648',s:14});}o.shake=.22;AU.hit(o.type);
@@ -1266,7 +1286,7 @@ function gainFloat(type,q,p,pure){try{if(run&&!run.recBeat){const R0=(S.recs||{}
   const ord=floats.filter(f=>f.ore);if(ord.length>=3){const i=floats.indexOf(ord[0]);if(i>=0)floats.splice(i,1);}
   floats.push({x:p[0],y:p[1],t:0,txt:'+'+q+' '+ORES[type].n,c:ORES[type].c,s:pure?18:15,ore:type,q});}
 function breakOre(o,src){
-  if(o.dead)return;if(o.boss&&o.hp>0){hitOre(o,ST.dmg()*2,'boss');return;}o.dead=true;try{window.fxSpawn&&fxSpawn('break',o.x,o.y);}catch(e){}if(run.tuto&&!run.tutoGo){run.tutoGo=true;tutoRunMsg(_t('Bravo ! Le butin va dans ton sac 🎒 (en haut à gauche). Maintenant l’oxygène 🫁 baisse — regarde la barre en haut : casse un maximum de rochers !'));}run.blocks++;S.stats.blocks++;evAdd(1);if(CURWX&&CURWX.id==='etoiles'&&Math.random()<.08){run.stars++;}if(run.deep){run.deepCnt++;if(run.deepCnt>=run.deepGoal)setTimeout(deepNext,250);else $('hint').textContent=_t('⛏️ Puits profond · étage ')+run.deep+' · '+run.deepCnt+'/'+run.deepGoal;}
+  if(o.dead)return;if(o.boss&&o.hp>0){hitOre(o,ST.dmg()*2,'boss');return;}o.dead=true;try{window.fxSpawn&&fxSpawn('break',o.x,o.y);}catch(e){}if(run.tuto&&!run.tutoGo){run.tutoGo=true;tutoRunMsg(_t('Bravo ! Le butin va dans ton sac 🎒 (en haut à gauche). Maintenant l’oxygène 🫁 baisse — regarde la barre en haut : casse un maximum de rochers !'));}run.blocks++;S.stats.blocks++;evAdd(1);if(CURWX&&CURWX.id==='etoiles'&&Math.random()<.08){run.stars++;}if(run.deep){run.deepCnt++;if(run.deepCnt>=run.deepGoal)cmDeferFloor(deepNext,250);else $('hint').textContent=_t('⛏️ Puits profond · étage ')+run.deep+' · '+run.deepCnt+'/'+run.deepGoal;}
   let q=(ST.yield()+(tierOf(o.type)>=1?L('geo'):0))*(o.pure?3:1);if(L('lumi_col')&&Math.random()<.1*L('lumi_col')){q+=1;lumi.say=.8;}run.elanT=1;if(Math.random()<.05*L('filon')+(R('aimant')?.1:0)+(R('coeur7')?.05:0)+.08*RM('soute'))q*=2;if(S.boost>Date.now())q*=2;if(ITR('sac')>=4&&Math.random()<.1)q*=2;q*=petB('loot');
   run.combo=(run.comboT>0?(run.combo||0):0)+1;run.comboT=1.6;run.bestCombo=Math.max(run.bestCombo||0,run.combo);if(run.combo>=4)q+=1+Math.floor(run.combo/8);
   if(o.geode){q*=4;try{window.fxSpawn&&fxSpawn('energie',o.x,o.y);window.HITSTOP=.22;shake=Math.max(shake,7);window.lumiMood&&lumiMood('wow',2.6);}catch(e){}const types=unlockedOres();const t2=types[types.length-1];const bonus=3+Math.floor(Math.random()*6);run.gain[t2]=(run.gain[t2]||0)+bonus;run.stars+=1;const pg=iso(o.x,o.y,TH*1.6);floats.push({x:pg[0],y:pg[1]-24,t:-.15,txt:_t('💎 GÉODE ! +')+bonus+' '+ORES[t2].n+' +1 ⭐',c:'#ffffff',s:19});shake=10;GFX.flash=.4;vib([40,40,80]);run.geodes=(run.geodes||0)+1;}
@@ -1281,9 +1301,9 @@ function breakOre(o,src){
   if(Math.random()<.02*L('recyc')+.015*RM('infirmerie')){const g=addO2(.5);if(g>0)floats.push({x:p[0],y:p[1]-26,t:0,txt:'+'+fx(g)+' s O₂',c:'#7fe3ff',s:14});}
   rollLoot(o,p);
   if(L('explo')&&src!=='explo'&&Math.random()<.04*L('explo')){fxs.push({type:'ring',x:o.x,y:o.y,r:0,c:'255,140,60',big:1});AU.boom();shake=10;
-    for(const n of run.ores)if(!n.dead&&Math.hypot(n.x-o.x,n.y-o.y)<1.6)setTimeout(()=>breakOre(n,'explo'),80);}
+    for(const n of run.ores)if(!n.dead&&Math.hypot(n.x-o.x,n.y-o.y)<1.6)cmDeferRun(()=>breakOre(n,'explo'),80);}
   if(L('chaine')&&Math.random()<.06*L('chaine')){const nb=run.ores.filter(n=>!n.dead&&Math.hypot(n.x-o.x,n.y-o.y)<1.6);
-    if(nb.length){const n=nb[Math.floor(Math.random()*nb.length)];fxs.push({type:'dust',x:o.x,y:o.y,x2:n.x,y2:n.y,life:.4});setTimeout(()=>breakOre(n,'chaine'),140);}}
+    if(nb.length){const n=nb[Math.floor(Math.random()*nb.length)];fxs.push({type:'dust',x:o.x,y:o.y,x2:n.x,y2:n.y,life:.4});cmDeferRun(()=>breakOre(n,'chaine'),140);}}
   if(target===o)target=null;
 }
 function rollLoot(o,p){
@@ -1308,7 +1328,7 @@ function updRun(dt){
   run.t-=dt*o2Drain()*(1-.05*L('regul'))*(run.tuto&&!run.tutoGo?0:1);if(run.comboT>0){run.comboT-=dt;if(run.comboT<=0)run.combo=0;}run.elanT=Math.max(0,(run.elanT||0)-dt);updEvents(dt);updMons(dt);if(!run||run.done)return;hazUpdate(dt);if(!run||run.done)return;exploreUpdate(dt);if(!run||run.done||run.paused)return;
   if(run.t<2.2){run.alarmT-=dt;if(run.alarmT<=0){run.alarmT=.5;AU.alarm();}}
   for(const o of run.ores){o.shake=Math.max(0,o.shake-dt);if(o.sc<1)o.sc=Math.min(1,o.sc+dt*3);}
-  run.ores=run.ores.filter(o=>!o.dead||false);
+  {/* v49 : retrait des roches cassées SUR PLACE (même tableau : les actions AGM liées à la sortie restent valides, et aucune allocation par image) */const a=run.ores;let w=0;for(let i=0;i<a.length;i++){const o=a[i];if(!o.dead)a[w++]=o;}a.length=w;}
   // déplacement & frappe
   cd-=dt;if(player.swing>0)player.swing-=dt;
   const tool=curTool();
@@ -1317,7 +1337,7 @@ function updRun(dt){
     if(d>tool.range*(tool.beam?1:.95)+.15){dest=[target.x,target.y,tool.range*.9];}
     else{player.moving=false;const sdx=(target.x-player.x)-(target.y-player.y);if(Math.abs(sdx)>.05)player.face=sdx>0?1:-1;
       if((holding||pending>0)&&cd<=0){player.combo=player.lastT===target?(player.combo||0)+1:0;player.lastT=target;cd=ST.cd()*(1-.03*L('rythme')*Math.min(player.combo,5));player.swingDur=Math.min(.34,cd*.85);player.swing=player.swingDur;pending=Math.max(0,pending-1);
-        const o=target;setTimeout(()=>{if(!run||run.done||o.dead)return;doStrike(o);},player.swingDur*500);}}}
+        const o=target;cmDeferRun(()=>{if(!o.dead)doStrike(o);},player.swingDur*500);}}}
   else if(moveTo){dest=[moveTo[0],moveTo[1],.05];}
   if(dest){const dx=dest[0]-player.x,dy=dest[1]-player.y,d=Math.hypot(dx,dy);
     if(d>dest[2]){const sp=curSpeed()*dt,stp=Math.min(sp,d-dest[2]);const sd=steerDir(player.x,player.y,dest[0],dest[1]);let nx=player.x+sd[0]*stp,ny=player.y+sd[1]*stp;
@@ -1327,7 +1347,7 @@ function updRun(dt){
     else{player.moving=false;if(!target)moveTo=null;}}
   else player.moving=false;
   if(run.goWreck&&WORLD.wreck&&Math.hypot(player.x-WORLD.wreck.x,player.y-WORLD.wreck.y)<1.6){run.goWreck=false;lootWreck();}
-  if(run.t<=0){if(L('souffle')&&!run.souffle){run.souffle=1;run.t=1.5*L('souffle');run.total=Math.max(run.total,run.t);const pp=iso(player.x,player.y,TH*2);floats.push({x:pp[0],y:pp[1],t:0,txt:_t('💨 Second souffle !'),c:'#7fe3ff',s:17});}else if(!run.revive&&S.runs>=6&&S.runs%2===0&&Object.keys(run.gain).length){run.revive=1;run.t=0;run.paused=true;holding=false;pending=0;offerRevive();}else{run.t=0;endRun();}}
+  if(run.t<=0){if(L('souffle')&&!run.souffle){run.souffle=1;run.t=1.5*L('souffle');run.total=Math.max(run.total,run.t);const pp=iso(player.x,player.y,TH*2);floats.push({x:pp[0],y:pp[1],t:0,txt:_t('💨 Second souffle !'),c:'#7fe3ff',s:17});}else if(!run.revive&&S.runs>=6&&S.runs%2===0&&Object.keys(run.gain).length){run.revive=1;run.t=0;run.paused=true;resetMiningContact(true);offerRevive();}else{run.t=0;endRun();}}
   updHud();
 }
 // contournement des obstacles ronds (vaisseau, mares) : le héros longe l'obstacle au lieu de rester bloqué
@@ -1373,9 +1393,10 @@ function updHud(){
   if(run.boss){$('bossFill').style.width=Math.max(0,run.boss.hp/run.boss.max*100)+'%';$('bossHp').textContent=run.boss.dead?'VAINCU !':fmt(Math.max(0,run.boss.hp))+' PV';}
   {const ld=runLoad(),cm=capMax();$('gain').dataset.cap='🎒 '+fmt(ld)+'/'+fmt(cm);}$('gain').innerHTML='<span class="chip" style="'+(runLoad()>=capMax()*.9?'border-color:#ff6b6b;color:#ff9a9a':'')+'">'+$('gain').dataset.cap+'</span>'+(run.carry&&!run.carry.ok?'<span class="chip" style="border-color:#ffd23f">💎 → 🚀</span>':'')+Object.keys(run.gain).map(r=>'<span class="chip">'+gemHTML(r)+'+'+fmt(run.gain[r])+'</span>').join('')+(run.stars?'<span class="chip">⭐ +'+run.stars+'</span>':'');
 }
-function endRun(){try{localStorage.removeItem(KEY+'_run');}catch(e){}
+function endRun(){
+  if(!run||run.done)return;CM_FLOOR.leave();CM_ENGINE.flush();try{localStorage.removeItem(KEY+'_run');}catch(e){}
   if(run.carry&&!run.carry.ok&&!run.lost){lumiPend('lumi_fail');for(const k in run.gain)run.gain[k]=Math.floor(run.gain[k]*.7);run.loot.push(_t('💔 Le minerai exceptionnel est perdu… et 30 % du butin avec lui.'));$('hint').textContent='';}
-  NEXTCARD=null;run.done=true;holding=false;if(S.runs+1===15||(S.runs+1)%100===0)backupNudge('runs');$('vign').style.opacity=0;
+  NEXTCARD=null;run.done=true;resetMiningContact();if(S.runs+1===15||(S.runs+1)%100===0)backupNudge('runs');$('vign').style.opacity=0;
   for(const r in run.gain)S.inv[r]=(S.inv[r]||0)+run.gain[r];run.starsRaw=run.stars;run.stars=freeStars(run.stars);S.runs++;if(S.runs===3&&!META.notifAsk&&('Notification' in window)&&Notification.permission==='default'&&MONET.inApp&&MONET.inApp()){META.notifAsk=1;enqueue(()=>modal('<div style="font-size:40px">🔔</div><div class="nm">'+_t('Veux-tu que LUMI te prévienne quand une récompense spéciale t’attend ?')+'</div>',[[_t('Plus tard'),()=>{}],[_t('Oui'),()=>{try{Notification.requestPermission();}catch(e){}}]]));}if(run.tuto){S.tuto='end';const te=$('tuto');if(te)te.className='';}
   if(S.lastBuyRun===undefined)S.lastBuyRun=S.runs;
   try{helpNoBuy();}catch(e){console.warn(e);}
@@ -1419,15 +1440,18 @@ cv.addEventListener('pointerdown',e=>{
   AU.init();AU.resume();
   if(mode==='hub'&&tab!=='ship'&&GATE_S){const rr=cv.getBoundingClientRect();if(Math.hypot(e.clientX-rr.left-GATE_S[0],e.clientY-rr.top-GATE_S[1])<GATE_S[2]){openGalaxy();return;}}
   if(mode==='hub'&&tab==='ship'&&!full){const rr=cv.getBoundingClientRect();const cxp=e.clientX-rr.left,cyp=e.clientY-rr.top;const cm=CREW_S.find(c=>Math.hypot(c[1]-cxp,c[2]-cyp)<c[3]);if(cm){openCrew(cm[0]);return;}const zb=ZBTN.find(b=>Math.hypot(b[0]-cxp,b[1]-cyp)<b[2]+6);if(zb){roomZoom=zb[3]==='in';AU.click&&AU.click();return;}const rm=roomAt(e.clientX-rr.left,e.clientY-rr.top);if(rm){selRoom=rm.id;roomZoom=true;AU.click();renderHub();$('ship').scrollTop=0;}else if(roomZoom){roomZoom=false;AU.click&&AU.click();}return;}
-  if(mode!=='run'||!run||run.done)return;
+  if(mode!=='run'||!run||run.done||run.paused)return;
+  if(!Number.isInteger(e.pointerId)||e.button!==0||miningPointerId!==null)return;
   const r=cv.getBoundingClientRect(),sx=e.clientX-r.left,sy=e.clientY-r.top;
   const wr=WORLD.wreck;if(wr&&!S.story.wrecks[S.planet]){const ws=iso(wr.x,wr.y,TH*.5);if(Math.hypot(ws[0]-sx,ws[1]-sy)<TW*.8){target=null;moveTo=[wr.x+.7,wr.y+.9];run.goWreck=true;fxs.push({type:'tap',x:wr.x,y:wr.y,life:.5});return;}}
   const o=nearestOreAt(sx,sy);
-  if(o){run.goWreck=false;target=o;moveTo=null;holding=true;pending=Math.min(pending+1,2);$('hint').textContent='';}
+  if(o){run.goWreck=false;target=o;moveTo=null;miningPointerId=e.pointerId;holding=true;pending=Math.min(pending+1,2);try{cv.setPointerCapture(e.pointerId);}catch(_){}$('hint').textContent='';}
   else{const[wx,wy]=unIso(sx,sy);target=null;moveTo=[clamp(wx,.6,N-.6),clamp(wy,.6,N-.6)];fxs.push({type:'tap',x:moveTo[0],y:moveTo[1],life:.5});}
 });
-window.addEventListener('pointerup',()=>{holding=false;});
-window.addEventListener('pointercancel',()=>{holding=false;});
+window.addEventListener('pointerup',e=>{if(miningPointerId!==null&&e.pointerId===miningPointerId)resetMiningContact();});
+window.addEventListener('pointercancel',e=>{if(miningPointerId!==null&&e.pointerId===miningPointerId)resetMiningContact(true);});
+cv.addEventListener('lostpointercapture',e=>{if(miningPointerId!==null&&e.pointerId===miningPointerId)resetMiningContact(true);});
+window.addEventListener('blur',()=>{if(miningPointerId!==null)resetMiningContact(true);});
 
 /* =====================================================================
    8. BOUCLE DE RENDU
@@ -1464,7 +1488,7 @@ function newMote(init){const p=PL(),fl=p.flora,x=cam.x+rnd(-8,8),y=cam.y+rnd(-8,
   if(fl==='shroom')return{x,y,z:rnd(0,30),vx:rnd(-.15,.15),vy:rnd(-.15,.15),vz:rnd(4,12),life:rnd(3,7),k:'spore',c:Math.random()<.5?'120,255,220':'200,140,255'};
   if(fl==='vent')return{x,y,z:rnd(0,20),vx:rnd(-.2,.2),vy:rnd(-.2,.2),vz:rnd(20,45),life:rnd(1.5,3.5),k:'ember'};
   return{x,y,z:rnd(0,60),vx:rnd(-.3,.3),vy:rnd(-.3,.3),vz:rnd(-4,4),life:rnd(3,6),k:'void'};}
-function updAmbient(dt){if(dt>0){GFX.fpsA+=(1/dt-GFX.fpsA)*.05;if(GFX.fpsA<38&&GFX.q>1){GFX.lowT+=dt;if(GFX.lowT>4){GFX.q=1;GFX.lc=null;resize();}}else GFX.lowT=Math.max(0,GFX.lowT-dt);}if(!META.set.fx||GFX.q<2){GFX.amb.length=0;return;}const fl=PL().flora,n=fl==='cactus'?30:fl==='ice'?70:45;const A=GFX.amb;while(A.length<n)A.push(newMote(true));
+function updAmbient(dt){if(dt>0){GFX.fpsA+=(1/dt-GFX.fpsA)*.05;if(CM_ADAPT){try{CM_ADAPT.sample(GFX.fpsA,Math.min(dt,1),!document.hidden);}catch(e){}}else if(GFX.fpsA<38&&GFX.q>1){GFX.lowT+=dt;if(GFX.lowT>4){GFX.q=1;GFX.lc=null;resize();}}else GFX.lowT=Math.max(0,GFX.lowT-dt);}if(!META.set.fx||GFX.q<2){GFX.amb.length=0;return;}const fl=PL().flora,n=fl==='cactus'?30:fl==='ice'?70:45;const A=GFX.amb;while(A.length<n)A.push(newMote(true));
   for(let i=0;i<A.length;i++){const m=A[i];m.life-=dt;m.x+=m.vx*dt;m.y+=m.vy*dt;m.z+=m.vz*dt;if(m.life<=0||m.z<0||Math.abs(m.x-cam.x)>9||Math.abs(m.y-cam.y)>9)A[i]=newMote(false);}}
 function drawAmbient(t){const k=TW/60;for(const m of GFX.amb){const q=iso(m.x,m.y,m.z*k);if(q[0]<-10||q[0]>W+10||q[1]<-10||q[1]>H+10)continue;const fade=clamp(m.life,0,1)*clamp(m.z/8+.2,0,1);
   if(m.k==='dust'){cx.strokeStyle='rgba(255,225,180,'+(.28*fade)+')';cx.lineWidth=1.2;cx.beginPath();cx.moveTo(q[0],q[1]);cx.lineTo(q[0]+12*k,q[1]-1*k);cx.stroke();}
@@ -1868,7 +1892,7 @@ function drawGarden(t,tt){
 /* =====================================================================
    10. INTERFACE : menu, base, améliorations, vaisseau, boutique
    ===================================================================== */
-function setMode(m){mode=m;document.body.classList.toggle('inrun',m==='run');
+function setMode(m){if(m!==mode)resetMiningContact(true);if(m!=='run')CM_FLOOR.leave();mode=m;document.body.classList.toggle('inrun',m==='run');
   $('menu').classList.toggle('show',m==='menu');$('hud').classList.toggle('show',m==='run');$('hub').classList.toggle('show',m==='hub');$('cine').classList.toggle('show',m==='cine');$('tx').classList.toggle('show',m==='tx');
   if(m==='hub'){renderHub();if(S&&S.tuto==='end')enqueue(tutoEndModal);if(S&&S.tuto==='tree'&&!TUTO)setTimeout(tutoTree,300);checkDaily();checkStory();setTimeout(pump,400);hubTips();lumiIdle(true);}if(m==='menu')renderMenu();}
 let tT;function toast(t){const e=$('toast');e.textContent=t;e.classList.add('show');clearTimeout(tT);tT=setTimeout(()=>e.classList.remove('show'),2200);}
@@ -1877,12 +1901,13 @@ function modal(html,btns){try{$('toast').classList.remove('show');}catch(e){}con
   $('modal').classList.add('show');}
 const QUEUE=[];function enqueue(f){QUEUE.push(f);setTimeout(pump,50);}
 function pump(){if($('modal').classList.contains('show')||mode!=='hub')return;const f=QUEUE.shift();if(f)f();}
-function renderMenu(){$('bCont').style.display=S&&S.runs>0?'':'none';$('bNew').className=S&&S.runs>0?_t('btn s'):'btn';$('bNew').textContent=S&&S.runs>0?_t('✦ Nouvelle partie'):_t('▶ Nouvelle partie');
+function hasGame(){return !!(S&&(S.runs>0||S.name));}
+function renderMenu(){$('bCont').style.display=hasGame()?'':'none';$('bNew').className=hasGame()?_t('btn s'):'btn';$('bNew').textContent=hasGame()?_t('✦ Nouvelle partie'):_t('▶ Nouvelle partie');
   $('saveInfo').textContent=S&&S.runs>0?_t('💾 Sauvegarde auto · ')+PL().n+' · '+S.runs+_t(' expéditions'):_t('💾 Sauvegarde automatique activée');}
 $('bCont').onclick=()=>{AU.init();AU.resume();AU.startMusic();AU.click();catchUp();setMode('hub');};
 $('bNew').onclick=()=>{AU.init();AU.resume();AU.click();
   const go=()=>askName((nm,sx)=>{S=fresh();wipeRunMeta();S.name=nm;S.sex=sx;resetPass();eqInit();applyGender();genWorld();save();playCine('intro',()=>{AU.startMusic();setMode('hub');modal(_t('<div style="font-size:40px">🧑‍🚀</div><div class="nm" style="font-size:17px">Survivre sur Kepra-7</div><p class="mu" style="color:var(--cy)">🤖 LUMI : « Commencez par réparer la radio de bord, Capitaine. On pourra peut-être capter la Terre. »</p><p class="mu">Ta réserve d’oxygène ne tient que <b>15 secondes</b> dehors. Sors, touche les rochers pour les miner, et reviens avant d’étouffer.</p><p class="mu">Avec ce que tu ramènes, améliore ton équipement, débloque de nouveaux minerais, puis répare l’ORION pour rentrer auprès d’Evelyne, Izya, Imany et Lehyss.</p>'),[[_t('Compris !'),tutoTree]]);});});
-  if(S&&S.runs>0)modal(_t('<div class="nm">Nouvelle partie ?</div><p class="mu">Ta progression actuelle sera effacée. Tes étoiles et tes tenues sont conservées.</p>'),[[_t('Annuler'),null,'s'],[_t('Recommencer'),go]]);else go();};
+  if(hasGame())modal(_t('<div class="nm">Nouvelle partie ?</div><p class="mu">Ta progression actuelle sera effacée. Tes étoiles et tes tenues sont conservées.</p>'),[[_t('Annuler'),null,'s'],[_t('Recommencer'),go]]);else go();};
 function askName(cb){modal(_t('<div style="font-size:40px">🧑‍🚀</div><div class="nm" style="font-size:17px">Comment t’appelles-tu, Capitaine ?</div><p class="mu">LUMI et tes proches t’appelleront par ce prénom tout au long du voyage.</p><input id="nameIn" type="text" maxlength="14" placeholder="Ton prénom" autocomplete="off" style="width:100%;padding:12px;border-radius:10px;border:1px solid var(--ln);background:var(--bg);color:var(--tx);font:700 17px system-ui;text-align:center;margin-top:6px"><div class="row" style="justify-content:center">')+['Alex','Léo','Maya','Nova','Inès','Kim'].map(n=>'<button class="btn s" style="padding:6px 10px" onclick="$(\'nameIn\').value=\''+n+'\';setSexUI(guessSex(\''+n+'\'))">'+n+'</button>').join('')+_t('</div><p class="mu" style="margin:12px 0 4px">Sur Terre, qui t’attend ?</p><div class="row" style="justify-content:center"><button class="btn s" id="sexH" style="padding:8px 12px" onclick="setSexUI(\'h\',1)">👨 Je suis le papa<br><small>Evelyne et les enfants</small></button><button class="btn s" id="sexF" style="padding:8px 12px" onclick="setSexUI(\'f\',1)">👩 Je suis la maman<br><small>Quentin et les enfants</small></button></div>'),[[_t('C’est parti !'),()=>{let v=(($('nameIn')||{}).value||'').trim().replace(/[<>&"]/g,'').slice(0,14);if(!v)v='Alex';v=v.charAt(0).toUpperCase()+v.slice(1);cb(v,window._sexSel||guessSex(v));}]]);
   window._sexSel=S&&S.sex||'h';window._sexLock=false;setSexUI(window._sexSel);
   setTimeout(()=>{const i=$('nameIn');if(i){i.focus();if(S&&S.name)i.value=S.name;i.oninput=()=>{if(!window._sexLock)setSexUI(guessSex(i.value));};}},250);}
@@ -2264,7 +2289,7 @@ function catchUp(){
 }
 function runPend(){try{if(typeof mode!=='undefined'&&mode==='run'&&run&&!run.done&&!run.lost&&Object.keys(run.gain).length)localStorage.setItem(KEY+'_run',JSON.stringify({g:run.gain,p:S.planet,n:S.runs,t:Date.now()}));}catch(e){}}
 setInterval(runPend,8000);window.addEventListener('pagehide',runPend);
-document.addEventListener('visibilitychange',()=>{if(document.hidden){runPend();save();save.frozen=true;}else{save.frozen=false;if(S&&mode==='hub')catchUp();}});
+document.addEventListener('visibilitychange',()=>{try{CM_COORD&&CM_COORD.agm.setVisible(!document.hidden);}catch(_){}if(document.hidden){runPend();save();save.frozen=true;}else{save.frozen=false;if(S&&mode==='hub')catchUp();}});
 window.addEventListener('pagehide',save);
 /* v49 : demande au navigateur de ne jamais effacer la sauvegarde quand le téléphone manque de place */
 try{if(navigator.storage&&navigator.storage.persist)navigator.storage.persisted().then(p=>{if(!p)navigator.storage.persist().catch(()=>{});}).catch(()=>{});}catch(e){}
@@ -2722,18 +2747,18 @@ function bossDefeated(o){S.boss[S.planet]=1;try{const it=dropItem([1,1,2,2,3,3,3
   const p=iso(o.x,o.y,TH*2);floats.push({x:p[0],y:p[1],t:0,txt:_t('👹 CŒUR VAINCU !'),c:'#ffd23f',s:22});run.t+=5;run.total+=5;}
 function lightning(o,dmg){const jumps=2+L('arc');const d2=dmg*(.6+.25*L('surtension'));let from=o;const done=new Set([o]);AU.zap();
   for(let i=0;i<jumps;i++){const n=nearestLiveOre(run.ores,from,done);if(!n||Math.hypot(n.x-from.x,n.y-from.y)>3.2)break;done.add(n);
-    fxs.push({type:'zap',x:from.x,y:from.y,x2:n.x,y2:n.y,life:.3});const f=from;setTimeout(()=>{if(run&&!run.done&&!n.dead)hitOre(n,d2,'eclair');},60*(i+1));from=n;}}
+    fxs.push({type:'zap',x:from.x,y:from.y,x2:n.x,y2:n.y,life:.3});const f=from;cmDeferRun(()=>{if(!n.dead)hitOre(n,d2,'eclair');},60*(i+1));from=n;}}
 function throwBomb(){if(!run||run.done||!run.bombs)return;let tg=target&&!target.dead?target:null;
   if(!tg){tg=nearestLiveOre(run.ores,player,null);}
   if(!tg){toast(_t('Aucun rocher à portée'));return;}
   run.bombs--;$('bombN').textContent=run.bombs;if(!run.bombs)$('bombBtn').style.display='none';
   const x=tg.x,y=tg.y;fxs.push({type:'tap',x,y,life:.4});AU.tone(200,.35,'sawtooth',.08,80);
-  setTimeout(()=>{if(!run||run.done)return;AU.boom();shake=12;vib(120);fxs.push({type:'ring',x,y,r:0,c:'255,120,40',big:1});
+  cmDeferRun(()=>{AU.boom();shake=12;vib(120);fxs.push({type:'ring',x,y,r:0,c:'255,120,40',big:1});
     if(META.set.fx)for(let i=0;i<24;i++)parts.push({x,y,z:8,vx:rnd(-3,3),vy:rnd(-3,3),vz:rnd(80,220),life:1,c:i%2?'#ff9a3c':'#5a4a40',r:rnd(2,5)});
     const dmg=ST.dmg()*6;for(const o of [...run.ores])if(!o.dead&&Math.hypot(o.x-x,o.y-y)<1.9)hitOre(o,dmg,'bombe');},350);}
 $('bombBtn').addEventListener('pointerdown',e=>{e.stopPropagation();throwBomb();});
 function inFight(){return !!run&&((run.mons||[]).some(m=>!m.dead)||(run.boss&&!run.boss.dead));}
-function pauseRun(){if(mode!=='run'||!run||run.done||run.paused)return;run.paused=true;holding=false;pending=0;
+function pauseRun(){if(mode!=='run'||!run||run.done||run.paused)return;run.paused=true;resetMiningContact(true);
   const tot=Object.values(run.gain).reduce((a,b)=>a+b,0);
   modal(_t('<div class="big">⏸ Pause</div><p class="mu">Oxygène restant : ')+fx(Math.max(0,run.t))+_t(' s<br>Butin de cette sortie : ')+fmt(tot)+' '+plw(tot,'ressource')+_t('</p><p class="mu">Si tu quittes, tu rentres à l’ORION et tu <b>gardes</b> tout ce que tu as miné.</p>')+(inFight()?'<p style="color:#ff9a9a;font-weight:700">'+_t('⚠️ Créatures en vue : fuir maintenant coûte 20 % du butin.')+'</p>':''),
     [[_t('🏃 Quitter la sortie'),()=>{run.paused=false;if(inFight()){for(const k in run.gain)run.gain[k]=Math.floor(run.gain[k]*.8);if(run.carry&&!run.carry.ok){run.carry=null;}run.loot.push(_t('🏃 Fuite en plein combat : −20 % de butin'));}run.quit=true;run.t=0;endRun();},'s'],[_t('▶ Reprendre'),()=>{run.paused=false;}]]);}
@@ -2824,7 +2849,7 @@ function fondHTML(){fondTick();const F=S.fond,t=fondOre(),have=S.inv[t]||0,cur=F
   let h='<div class="card" style="margin-top:8px;border-color:#ff8a3a"><div class="nm">🔥 '+_t('Fonte')+' · '+gemHTML(t)+' '+ORES[t].n+' → 🧱</div><div class="mu">'+_t('100 minerais les plus rares de ta planète fondent en 1 lingot.')+' ('+durTxt(d)+')</div>';
   h+='<div class="mu" style="margin-top:4px">'+_t('En stock :')+' <b style="color:var(--tx)">'+fmt(have)+'</b> · '+_t('Fournées :')+' <b style="color:var(--tx)">'+F.q+'/'+fondMaxQ()+'</b> · 🧱 <b style="color:var(--ac2)">'+(S.inv.lingots||0)+'</b></div>';
   if(F.q>0)h+='<div class="pbar" style="margin-top:6px"><i style="width:'+Math.round(100*(1-cur/d))+'%;background:linear-gradient(90deg,#ff5a1f,#ffd23f)"></i></div><div class="mu">'+_t('Prochain lingot dans')+' '+durTxt(cur)+(F.q>1?' · '+_t('tout terminé dans')+' '+durTxt(fondLeft()):'')+'</div>';
-  h+='<div class="row"><button class="btn" '+(have>=FOND_N&&F.q<fondMaxQ()?'':'disabled')+' onclick="fondLoad(1)">🔥 '+_t('Fondre')+' ×1</button><button class="btn s" '+(have>=2*FOND_N&&F.q<fondMaxQ()-1?'':'disabled')+' onclick="fondLoad(99)">'+_t('Tout')+'</button>'+(F.q>0?'<button class="btn g" onclick="fondRush()">⚡ '+SP(fondRushCost())+'</button>':'')+'</div>'+'<div class="set" style="margin-top:6px"><span>♻️ '+_t('Remplir automatiquement la file')+'</span><div class="sw'+(S.fondAuto?' on':'')+'" onclick="S.fondAuto=!S.fondAuto;fondTick();save();renderHub()"></div></div>'+(ACC().fond>Date.now()?'<div class="mu" style="color:#ffb648">🔥 '+_t('Fonderie turbo active :')+' '+durTxt(ACC().fond-Date.now())+'</div>':'<div class="row"><button class="btn s" style="padding:6px 10px;font-size:12px" onclick="openAccel()">🔥 '+_t('Fonderie turbo ×3')+'</button></div>')+'</div>';
+  h+='<div class="row"><button class="btn" '+(have>=FOND_N&&F.q<fondMaxQ()?'':'disabled')+' onclick="fondLoad(1)">🔥 '+_t('Fondre')+' ×1</button><button class="btn s" '+(have>=2*FOND_N&&F.q<fondMaxQ()-1?'':'disabled')+' onclick="fondLoad(99)">'+_t('Tout')+'</button>'+(F.q>0?'<button class="btn g" onclick="fondRush()">⚡ '+SP(fondRushCost())+'</button>':'')+'</div>'+'<div class="set" style="margin-top:6px"><span>♻️ '+_t('Remplir automatiquement la file')+'</span><div class="sw'+(S.fondAuto?' on':'')+'" onclick="S.fondAuto=!S.fondAuto;fondTick();save();renderHub()"></div></div>'+(S.fondAuto?'<div class="set"><span>🛡️ '+_t('Garder le minerai des réparations')+(fondReserve()>0?' <small class="mu">('+fmt(fondReserve())+')</small>':'')+'</span><div class="sw'+(S.fondRes!==false?' on':'')+'" onclick="S.fondRes=(S.fondRes===false);fondTick();save();renderHub()"></div></div>':'')+(ACC().fond>Date.now()?'<div class="mu" style="color:#ffb648">🔥 '+_t('Fonderie turbo active :')+' '+durTxt(ACC().fond-Date.now())+'</div>':'<div class="row"><button class="btn s" style="padding:6px 10px;font-size:12px" onclick="openAccel()">🔥 '+_t('Fonderie turbo ×3')+'</button></div>')+'</div>';
   return h;}
 setInterval(()=>{if(S&&mode==='hub'){const b=S.inv.lingots||0;fondTick();if(tab==='ship'&&!full&&(selRoom==='fonderie'||(S.inv.lingots||0)!==b))renderHub();}},4000);
 let selRoom='cockpit',roomZoom=false,IVZ=1,ZBTN=[];const IVF={u:6,v:5};
@@ -3281,7 +3306,7 @@ function openEvent(e){AU.alarm();vib([60,60,60]);
   modal('<div style="font-size:40px">'+e.ic+'</div><div class="nm" style="font-size:17px">'+_t(e.title)+'</div><div class="mu">'+_t('📡 Transmission · De : ')+_t(e.from)+'</div><p class="mu" style="font-style:italic;text-align:left">'+_t(e.text)+'</p>'+
     e.ch.map((c,i)=>{const ok=!c.ok||c.ok();return '<button class="cardpick" '+(ok?'':_t('disabled style="opacity:.45"'))+' onclick="chooseEvent(\''+e.id+'\','+i+')"><span style="text-align:left"><b>'+_t(c.t)+'</b><br><span class="mu">'+_t(c.d)+'</span></span></button>';}).join(''),[]);
   $('mb').style.display='none';}
-function chooseEvent(id,i){const e=EVENTS.find(z=>z.id===id);if(!e)return;const c=e.ch[i];if(c.ok&&!c.ok())return;const nb=S.crew.length;const res=c.fx();if(S.crew.length>nb){const nc=S.crew[S.crew.length-1];albumAdd(CREW[nc].i,CREW[nc].n+' '+_t('rejoint l’équipage'));}S.evDone.push(id);save();$('mb').style.display='';AU.click();
+function chooseEvent(id,i){const e=EVENTS.find(z=>z.id===id);if(!e)return;/* F20 ChatGPT : double appui = double récompense → refusé */if((S.evDone||[]).includes(id)||!Number.isInteger(i)||i<0||!e.ch||i>=e.ch.length)return;const c=e.ch[i];if(c.ok&&!c.ok())return;const nb=S.crew.length;const res=c.fx();if(S.crew.length>nb){const nc=S.crew[S.crew.length-1];albumAdd(CREW[nc].i,CREW[nc].n+' '+_t('rejoint l’équipage'));}S.evDone.push(id);save();$('mb').style.display='';AU.click();
   modal('<div style="font-size:36px">'+e.ic+'</div><div class="nm">'+_t(c.t)+'</div><p class="mu">'+_t(res)+'</p>',[[_t('Continuer'),()=>renderHub()]]);}
 function crewHTML(){if(!S.crew.length&&!S.flags.espoir&&!S.flags.verite)return'';let h='<div class="nm" style="margin:10px 2px 6px">'+_t('👥 Équipage de l’ORION')+'</div><div class="card">';
   h+='<div>'+esc(HERO())+' · LUMI'+'</div>';for(const c of S.crew){const z=CREW[c];if(!z)continue;const ms=(S.crewMis||{})[c];h+='<div style="cursor:pointer;padding:3px 0" onclick="'+(ms?'openMission':'openCrew')+'(\''+c+'\')">'+z.i+' <b>'+z.n+'</b> '+(ms?(Date.now()>=ms.end?'<b style="color:var(--ok)">'+_t('🎁 de retour !')+'</b>':'<span class="mu">🧭 '+_t('en expédition')+' · '+durTxt(ms.end-Date.now())+'</span>'):'<span class="mu">'+_t(z.d)+'</span> 💬')+'</div>';}
@@ -3651,12 +3676,19 @@ function needHelp(r,q){AU.click();const steps=[],btn=[];const st=(ok,t)=>steps.p
   else if(r==='noyaux'){ic='⚛️';st(GL('scan')>=1,_t('Les caches de ressources (Scanner avancé) en contiennent parfois.'));st(false,_t('Chaque Cœur de planète vaincu en donne un.'));st(false,_t('La boutique en vend, et on peut en échanger contre des étoiles.'));btn.push([_t('🛒 Voir les noyaux'),()=>openNoyaux()]);}
   else if(ORES[r]){ic='';const pl=PLANETS.findIndex(P=>P.ores.includes(r)),here=pl===S.planet,ul=unlockedOres().includes(r),sc=scanFor(r);
     if(pl!==HOMEP()&&!here){st(false,_t('Ce minerai vient de')+' '+(PLANETS[pl]||{n:'?'}).n+'. '+_t('Retournes-y avec le portail spatio-temporel (bouton 🌌).'));btn.push([_t('🌌 Carte galactique'),()=>{$('modal').classList.remove('show');openGalaxy();}]);}
-    else{if(sc)st(ul,ul?_t('Son détecteur est installé.'):_t('Installe son détecteur dans l’Arbre : ')+sc.n+'.');
+    else{if(sc)st(ul,ul?_t('Son détecteur est installé.'):_t('Installe son détecteur dans l’Arbre : ')+sc.n+'.');if(sc&&!ul){const g=cmNextScanner(r);if(g.node&&g.node.id!==sc.id)st(false,_t('Étape avant le détecteur :')+' '+g.node.n+(g.kind==='gather'?' ('+Object.keys(g.missing).map(k=>fmt(g.missing[k])+' '+rName(k)).join(', ')+')':'')+'.');}
       st(have(r)>=q,_t('Récolte-le pendant tes sorties')+' ('+fmt(have(r))+' / '+fmt(q)+'). '+_t('Plus un minerai est rare, plus il se trouve loin du vaisseau.'));
-      st(false,_t('Astuces : « Densité » et « Filon riche » dans l’Arbre en rapportent plus, les drones en récoltent même jeu fermé.'));
+      st(false,cmDroneOre(r)?_t('Astuces : « Densité » et « Filon riche » dans l’Arbre en rapportent plus, les drones en récoltent même jeu fermé.'):_t('Astuces : « Densité » et « Filon riche » dans l’Arbre en rapportent plus.'));
       if(sc&&!ul)btn.push([_t('🌳 Ouvrir l’Arbre'),()=>goTree(sc.id)]);btn.push([_t('🧑‍🚀 Sortir explorer'),()=>{$('modal').classList.remove('show');tab='tree';full=true;renderHub();setTimeout(()=>{const b=$('bGo');if(b)b.click();},120);}]);}}
   modal('<div style="display:flex;align-items:center;gap:10px;text-align:left"><div style="font-size:34px">🤖</div><div><div class="mu">LUMI</div><div class="nm" style="font-size:16px">'+_t('Il te manque :')+' '+(ic||gemHTML(r))+' '+fmt(Math.max(0,q-have(r)))+' '+name+'</div></div></div><div class="card" style="text-align:left;margin-top:8px">'+
     steps.map((x,i)=>'<div class="gal-r" style="align-items:flex-start"><span style="font-size:15px">'+(x[0]?'✅':(i+1)+'.')+'</span><span>'+x[1]+'</span></div>').join('')+'</div>',btn.concat([[_t('Merci LUMI !'),null,'s']]));}
+/* F18 ChatGPT : guidage. Si le détecteur est verrouillé, remonter jusqu'à la première étape réellement disponible et calculer ce qui manque. */
+function cmNextScanner(resource){try{if(isVisit())return {kind:'visit'};if(!PL().ores.includes(resource))return {kind:'foreign'};if(unlockedOres().includes(resource))return {kind:'mine',resource};
+  let node=scanFor(resource);const seen=new Set();while(node&&!skAvail(node)){if(seen.has(node.id)||!node.p||!SKM[node.p])return {kind:'review'};seen.add(node.id);node=SKM[node.p];}
+  if(!node||nodeLvl(node)>=nodeMax(node))return {kind:'review'};const cost=skCost(node),missing={};
+  for(const [r,q] of Object.entries(cost)){const n=Math.floor(have(r));if(!Number.isFinite(q)||q<=0||!Number.isFinite(n)||n<0)return {kind:'review'};if(q>n)missing[r]=q-n;}
+  if(Object.keys(missing).some(r=>!unlockedOres().includes(r)&&r!=='lingots'&&r!=='noyaux'))return {kind:'review'};return {kind:Object.keys(missing).length?'gather':'buy',node,cost,missing};}catch(e){return {kind:'review'};}}
+function cmDroneOre(r){const u=unlockedOres(),i=u.indexOf(r);return i>=0&&i<2;}/* les drones ne récoltent que les 2 premiers minerais débloqués */
 // ---------- B1. objectif guidé ----------
 function goalNow(){if(!S||run)return null;const P=PL();if(isVisit())return{t:_t('Visite de')+' '+P.n+' : '+_t('explore ce qu’il reste à découvrir'),go:()=>openGalaxy()};
   const parts=P.parts.map((pt,i)=>({pt,i})).filter(z=>!S.parts.includes(z.i));
@@ -3664,7 +3696,10 @@ function goalNow(){if(!S||run)return null;const P=PL();if(isVisit())return{t:_t(
   const can=parts.find(z=>canPay(partCost(z.pt)));if(can)return{t:'🔧 '+_t('Tu peux réparer :')+' '+can.pt.i+' '+can.pt.n,go:()=>{tab='ship';full=false;renderHub();setTimeout(()=>{const e=$('ship');if(e)e.scrollTop=1e5;},60);}};
   if(!parts.length){if(bossReady())return{t:'👹 '+_t('Affronte le Cœur de')+' '+P.n,go:()=>{tab='ship';full=false;renderHub();}};return{t:'🚀 '+_t('Tout est réparé : décolle !'),go:()=>{tab='ship';full=false;renderHub();setTimeout(()=>{const e=$('ship');if(e)e.scrollTop=1e5;},60);}};}
   const tool=SK.find(s=>s.tool&&skAvail(s)&&!L(s.id));if(tool&&canPay(skCost(tool)))return{t:'⛏️ '+_t('Nouvel outil disponible :')+' '+tool.n,go:()=>goTree(tool.id)};
-  const nx=parts[0],c=partCost(nx.pt);const miss=Object.keys(c).find(r=>have(r)<c[r]);if(miss){const sc=scanFor(miss);if(sc&&!L(sc.id))return{t:'📡 '+_t('Installe le détecteur')+' '+sc.n+' '+_t('pour trouver')+' '+ORES[miss].n,go:()=>goTree(sc.id)};
+  const nx=parts[0],c=partCost(nx.pt);const miss=Object.keys(c).find(r=>have(r)<c[r]);if(miss){const sc=scanFor(miss);if(sc&&!L(sc.id)){const g=cmNextScanner(miss);
+      if(g.node&&g.node.id!==sc.id){if(g.kind==='buy')return{t:'📡 '+_t('Débloque d’abord')+' '+g.node.n+' → '+sc.n,go:()=>goTree(g.node.id)};if(g.kind==='gather'){const r2=Object.keys(g.missing)[0];return{t:'🎯 '+g.node.n+' : '+_t('encore')+' '+fmt(g.missing[r2])+' '+rName(r2),go:()=>needHelp(r2,g.cost[r2])};}}
+      if(g.kind==='gather'&&g.node&&g.node.id===sc.id){const r2=Object.keys(g.missing)[0];return{t:'📡 '+sc.n+' : '+_t('encore')+' '+fmt(g.missing[r2])+' '+rName(r2),go:()=>needHelp(r2,g.cost[r2])};}
+      return{t:'📡 '+_t('Installe le détecteur')+' '+sc.n+' '+_t('pour trouver')+' '+ORES[miss].n,go:()=>goTree(sc.id)};}
     return{t:'🎯 '+nx.pt.i+' '+nx.pt.n+' : '+_t('encore')+' '+fmt(c[miss]-have(miss))+' '+ORES[miss].n,go:()=>needHelp(miss,c[miss])};}
   return null;}
 function goalBar(){const e=$('goalBar');if(!e)return;const g=(mode==='hub')?goalNow():null;window.GOALF=g&&g.go;e.className=g?'on':'';e.innerHTML=g?'<button onclick="GOALF&&GOALF()"><span style="font-size:18px">🎯</span><span class="grow"><b>'+_t('Objectif')+'</b> · '+g.t+'</span><span>›</span></button>':'';}
@@ -3672,7 +3707,9 @@ function goalBar(){const e=$('goalBar');if(!e)return;const g=(mode==='hub')?goal
 function labQueueAdd(id){const sub=labSubjects().find(z=>z.id===id);if(!sub)return;S.labQ=S.labQ||[];if(S.labQ.length>=2||S.labQ.some(q=>q.id===id)||(S.lab&&S.lab.id===id))return;const st=labStage(id)+(S.labQ.filter(q=>q.id===id).length);if(st>=4)return;const c=labCost(sub,st);if(!canPay(c))return;pay(c);S.labQ.push({id,k:sub.k,st});AU.buy();save();renderHub();toast('🔬 '+_t('Ajouté à la file :')+' '+sub.n);}
 function labQueueNext(endAt){S.labQ=S.labQ||[];if(S.lab||!S.labQ.length)return;const q=S.labQ.shift();S.lab={id:q.id,end:(endAt||Date.now())+labDur(q.st),k:q.k};}
 // ---------- B3. fonderie automatique ----------
-function fondAutoFill(){if(!S||!S.fondAuto||RM('fonderie')<1)return;const F=S.fond||(S.fond={q:0,end:0});const t=fondOre(),room=fondMaxQ()-F.q,can=Math.min(room,Math.floor((S.inv[t]||0)/FOND_N));if(can>0){S.inv[t]-=can*FOND_N;if(F.q<=0)F.end=Date.now()+fondDur();F.q+=can;}}
+/* F18 ChatGPT : réserve de la fonderie. Le remplissage automatique ne consomme pas le minerai rare dont les réparations restantes ont besoin (réglage, activé par défaut). */
+function fondReserve(){try{if(S.fondRes===false||isVisit())return 0;const t=fondOre(),P=PL();let need=0;P.parts.forEach((pt,i)=>{if(!S.parts.includes(i)){const c=partCost(pt);if(c[t])need+=c[t];}});return Math.max(0,need);}catch(e){return 0;}}
+function fondAutoFill(){if(!S||!S.fondAuto||RM('fonderie')<1)return;const F=S.fond||(S.fond={q:0,end:0});const t=fondOre(),room=fondMaxQ()-F.q,can=Math.min(room,Math.floor(Math.max(0,(S.inv[t]||0)-fondReserve())/FOND_N));if(can>0){S.inv[t]-=can*FOND_N;if(F.q<=0)F.end=Date.now()+fondDur();F.q+=can;}}
 // ---------- B5. bilan de sortie : où en est le décollage ----------
 function sumProgressHTML(){if(isVisit()||run&&run.deep)return'';const P=PL(),tot=P.parts.length,done=S.parts.length;const nx=P.parts.map((pt,i)=>({pt,i})).find(z=>!S.parts.includes(z.i));
   let h='<div class="card" style="text-align:left;margin-top:8px"><div class="mu">🚀 '+_t('Décollage :')+' <b style="color:var(--tx)">'+done+'/'+tot+'</b> '+_t('modules réparés')+'</div><div class="pbar" style="margin-top:4px"><i style="width:'+Math.round(done/tot*100)+'%;background:linear-gradient(90deg,#ffb648,#62e0a2)"></i></div>';
