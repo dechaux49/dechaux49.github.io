@@ -1,13 +1,13 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
+<meta name="cm-version" content="v49">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <meta name="theme-color" content="#05040b">
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icon-192.png">
 <title>Castaway Miner</title>
-<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9169155228115968" crossorigin="anonymous"></script>
 <style>
 :root{--bg:#07060d;--p:#141221;--p2:#1d1a30;--ln:#332c52;--tx:#f1eefb;--mu:#9d95ba;--ac:#ffb648;--ac2:#ffd88a;--ok:#62e0a2;--bad:#ff6b6b;--cy:#6fe3ff}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none}
@@ -364,6 +364,18 @@ textarea{width:100%;min-height:56px;background:var(--bg);color:var(--tx);border:
 </div>
 
 <script>
+/* v49 axe 5 — journal de diagnostic LOCAL (prototype ChatGPT AX5 adapté) : 50 entrées max, codes + type d'erreur + fichier:ligne de NOTRE code.
+   Aucun message brut, aucune donnée du joueur, rien n'est envoyé : le joueur partage lui-même le rapport depuis les réglages. */
+const DIAG=(function(){const K='cm_diag_v1',MAX=50;let ev=[],dirty=false,blocked=false,lastAt=0,wT=0;
+  try{const r=localStorage.getItem(K);if(r&&r.length<16000){const d=JSON.parse(r);if(d&&d.schema===1&&Array.isArray(d.events))ev=d.events.slice(-MAX);}}catch(e){}
+  const md=()=>{try{return typeof mode==='string'?mode:'boot';}catch(e){return 'boot';}};
+  const site=st=>{try{const m=String(st||'').match(/(index\.html|realiste\.js|cinematiques[^\/:]*\.js|sw\.js)[^:\n]*:(\d+):(\d+)/);return m?m[1]+':'+m[2]:'';}catch(e){return '';}};
+  function rec(code,e){try{const name=(e&&e.name&&/^[A-Za-z]{1,30}$/.test(e.name))?e.name:'';const where=site(e&&e.stack);const now=Date.now(),l=ev[ev.length-1],m=md();
+    if(l&&l.c===code&&l.m===m&&l.w===where&&now-lastAt<1000)l.n=Math.min(65535,l.n+1);else{if(ev.length>=MAX)ev.shift();ev.push({c:code,t:name,w:where,m,n:1});}lastAt=now;dirty=true;}catch(_){}}
+  function flush(force){try{if(!dirty||blocked)return;const now=Date.now();if(!force&&now-wT<60000)return;localStorage.setItem(K,JSON.stringify({schema:1,events:ev}));dirty=false;wT=now;}catch(e){blocked=true;}}
+  try{window.addEventListener('error',e=>{if(e&&e.target&&e.target!==window&&(e.target.src||e.target.href)){let f='';try{f=String(e.target.src||e.target.href).split(/[?#]/)[0].split('/').pop().slice(0,40);}catch(_){}rec('RESOURCE_ERROR',{name:'',stack:''});const l=ev[ev.length-1];if(l&&f)l.w=f;}else rec('JS_ERROR',e&&e.error);},true);
+      window.addEventListener('unhandledrejection',e=>rec('PROMISE_REJECTION',e&&e.reason));}catch(e){}
+  return {rec,flush,list:()=>ev.slice(),clear(){ev=[];dirty=false;try{localStorage.removeItem(K);return true;}catch(e){return false;}}};})();
 /* ====== LANGUES : français · English · español ====== */
 const MKEY0='mineur_stellaire_meta';
 let LANG=(function(){try{const m=JSON.parse(localStorage.getItem(MKEY0)||'{}');if(m&&['fr','en','es','de','pt','id','ja','hi','ur'].includes(m.lang))return m.lang;}catch(e){}let n=((navigator.language||'fr')+'').slice(0,2).toLowerCase();if(n==='in')n='id';return ['fr','en','es','de','pt','id','ja','hi','ur'].includes(n)?n:'en';})();
@@ -385,7 +397,7 @@ function _t(s){if(LANG==='fr'||typeof s!=='string')return s;const d=I18N[LANG];i
 function setLang(l){try{if(typeof META!=='undefined'){META.lang=l;save();}const m=JSON.parse(localStorage.getItem(MKEY0)||'{}');m.lang=l;localStorage.setItem(MKEY0,JSON.stringify(m));}catch(e){}location.reload();}
 function i18nDom(root){if(LANG==='fr')return;const d=I18N[LANG];const w=document.createTreeWalker(root||document.body,NodeFilter.SHOW_TEXT);let n;while((n=w.nextNode())){if(n.parentNode&&n.parentNode.tagName==='SCRIPT')continue;n.nodeValue=_seg(n.nodeValue,d);}document.querySelectorAll('[placeholder]').forEach(e=>{const v=d[e.getAttribute('placeholder')];if(v)e.setAttribute('placeholder',v);});}
 </script>
-<script id="i18nload">if(LANG!=='fr')document.write('<script src="i18n/'+LANG+'.js?v=c50b3e2a"><\/script>');</script>
+<script id="i18nload">if(LANG!=='fr')document.write('<script src="i18n/'+LANG+'.js?v=823a11d4"><\/script>');</script>
 <script>
 'use strict';
 /* =====================================================================
@@ -641,10 +653,21 @@ let META={set:{music:.55,sfx:.85,vib:true,fx:true},stars:0,skins:['nasa'],skin:'
 function fresh(){return{eq:{sac:{r:0}},eqInv:{},alloy:{},cards:{},crewMis:{},outp:{},deepBest:0,pets:[],pet:null,gear:{},slots:{},mods:{},recipes:['servo','micro','plaque'],poi:{},lab:null,labSt:{},kills:{},crew:[],karma:0,evDone:[],evLast:0,flags:{},techs:[],drT:0,v:2,planet:0,inv:{roche:0},sk:{},parts:[],runs:0,last:Date.now(),stats:{blocks:0,loot:0,chests:0,best:0},ended:false,boost:0,story:freshStory(),relics:[],boss:{},contracts:[],rooms:{},items:{},fondT:0,pp:0,pk:{},pBlocks:0};}
 function wipeRunMeta(){for(const k of ['album','sev','codex','codexR','piggy','dshop','usedPortal'])delete META[k];try{ensureEco();}catch(e){}}
 function freshStory(){return{radio:false,video:false,seen:[],rep:{},frags:0,photo:false,drawing:false,wrecks:{},logs:[],daily:{last:'',streak:0},tips:{}};}
-function save(){if(!S)return;S.last=Date.now();try{const js=JSON.stringify(S);localStorage.setItem(KEY,js);localStorage.setItem(MKEY,JSON.stringify(META));/* ST01 : copie de secours toutes les 60 s */if(S.runs>0&&Date.now()-(save.bakT||0)>60000){save.bakT=Date.now();try{localStorage.setItem(KEY+'_bak',js);localStorage.setItem(MKEY+'_bak',JSON.stringify(META));}catch(_){}}}catch(e){if(!save.warned){save.warned=1;try{toast(_t('⚠️ Sauvegarde impossible : la mémoire du téléphone est pleine.'));}catch(_){}}return false;}flashSave();return true;}
-function loadAll(){try{let m=localStorage.getItem(MKEY),mm=null;try{mm=m?JSON.parse(m):null;}catch(e){try{localStorage.setItem(MKEY+'_corrupt',m);const b=localStorage.getItem(MKEY+'_bak');mm=b?JSON.parse(b):null;}catch(_){}}if(mm)META=Object.assign(META,mm);META.set=Object.assign({music:.55,sfx:.85,vib:true,fx:true},META.set);}catch(e){}
+/* v49 axe 1 (P0 ChatGPT) : jamais de nombre invalide (NaN, infini, négatif) écrit dans la sauvegarde ; on remet la dernière valeur saine connue */
+function guardState(){const fix=[],G=save.good||{};const g=(o,k,lbl)=>{const v=o[k];if(v!==undefined&&!(typeof v==='number'&&Number.isFinite(v)&&v>=0)){o[k]=Number.isFinite(G[lbl])?G[lbl]:0;fix.push(lbl);}};
+  try{for(const k in (S.inv||{}))g(S.inv,k,'inv.'+k);g(META,'stars','stars');g(S,'runs','runs');if(fix.length)DIAG.rec('STATE_FIX',{name:'Fix'});
+    const n={stars:META.stars,runs:S.runs};for(const k in (S.inv||{}))n['inv.'+k]=S.inv[k];save.good=n;}catch(e){}return fix;}
+function save(){if(!S)return;/* B1.10 ChatGPT : l'heure de départ (gains hors-ligne) ne bouge plus en arrière-plan ni au menu d'accueil ; catchUp() la remet à jour au retour */let md='';try{md=mode;}catch(e){}if(!save.frozen&&md!=='menu')S.last=Date.now();guardState();
+  /* v49 axe 1 (C1 ChatGPT) : partie + compte (achats, étoiles) écrits ensemble en UNE seule écriture ; les anciennes clés restent écrites pour la compatibilité */
+  try{S._t=Date.now();const js=JSON.stringify(S),mj=JSON.stringify(META);
+    let envOk=false;try{localStorage.setItem(KEY+'_env','{"v":1,"S":'+js+',"M":'+mj+'}');envOk=true;}catch(qe){try{localStorage.removeItem(KEY+'_env');}catch(_){}}
+    if(envOk){try{localStorage.setItem(KEY,js);localStorage.setItem(MKEY,mj);}catch(_){}}else{localStorage.setItem(KEY,js);localStorage.setItem(MKEY,mj);}/* ST01 : copie de secours toutes les 60 s */if(S.runs>0&&Date.now()-(save.bakT||0)>60000){save.bakT=Date.now();try{localStorage.setItem(KEY+'_bak',js);localStorage.setItem(MKEY+'_bak',JSON.stringify(META));}catch(_){}}}catch(e){if(!save.warned){save.warned=1;try{toast(_t('⚠️ Sauvegarde impossible : la mémoire du téléphone est pleine.'));}catch(_){}}DIAG.rec('SAVE_ERROR',e);return false;}flashSave();try{if(md==='hub'||md==='menu')DIAG.flush();}catch(_){}return true;}
+function loadAll(){/* v49 : l'enveloppe S+META est utilisée si elle est valide et au moins aussi récente que les anciennes clés */
+  let ENV=null;try{const e=localStorage.getItem(KEY+'_env');if(e){const d=JSON.parse(e);if(d&&d.v===1&&d.S&&d.S.v===2&&d.M&&typeof d.M==='object')ENV=d;}}catch(e){try{DIAG.rec('ENV_CORRUPT',e);}catch(_){}}
+  if(ENV){let legT=-1;try{const r0=localStorage.getItem(KEY);const d0=r0?JSON.parse(r0):null;legT=d0?(d0._t||0):-1;}catch(e){legT=-1;}if((ENV.S._t||0)<legT)ENV=null;}
+  try{let m=ENV?JSON.stringify(ENV.M):localStorage.getItem(MKEY),mm=null;try{mm=m?JSON.parse(m):null;}catch(e){try{localStorage.setItem(MKEY+'_corrupt',m);const b=localStorage.getItem(MKEY+'_bak');mm=b?JSON.parse(b):null;}catch(_){}}if(mm)META=Object.assign(META,mm);META.set=Object.assign({music:.55,sfx:.85,vib:true,fx:true},META.set);}catch(e){}
   const parseS=r=>{try{const d=JSON.parse(r);return d&&d.v===2?d:null;}catch(e){return null;}};
-  try{let r=localStorage.getItem(KEY);if(r&&!parseS(r)){/* ST01 : sauvegarde illisible -> on la garde de côté et on reprend la copie de secours */try{localStorage.setItem(KEY+'_corrupt',r);}catch(_){}const b=localStorage.getItem(KEY+'_bak');if(b&&parseS(b)){r=b;setTimeout(()=>{try{toast(_t('💾 Sauvegarde restaurée depuis la copie de secours.'));}catch(_){}},2500);}}
+  try{let r=ENV?JSON.stringify(ENV.S):localStorage.getItem(KEY);if(r&&!parseS(r)){/* ST01 : sauvegarde illisible -> on la garde de côté et on reprend la copie de secours */try{localStorage.setItem(KEY+'_corrupt',r);}catch(_){}const b=localStorage.getItem(KEY+'_bak');if(b&&parseS(b)){r=b;setTimeout(()=>{try{toast(_t('💾 Sauvegarde restaurée depuis la copie de secours.'));}catch(_){}},2500);}}
   if(r){const d=parseS(r);if(d){if(!d.eq&&d.gear&&d.gear.bag){const br=Math.min(3,d.gear.bag);d.eq={sac:{r:br}};d.eqInv={['sac:'+br]:1};delete d.gear.bag;}const o=Object.assign(fresh(),d);o.story=Object.assign(freshStory(),d.story||{});return o;}}}catch(e){}return null;}
 let saveFlashT=0;function flashSave(){saveFlashT=1.2;}
 const L=id=>S.sk[id]||0;
@@ -699,7 +722,7 @@ const AU={ctx:null,master:null,sfx:null,mus:null,rev:null,musicOn:false,nextBar:
  boom(){this.noise(1.4,.6,300);this.tone(70,1,'sine',.5,30);},
  // musique d'ambiance spatiale : nappes + arpèges pentatoniques, générées à l'infini
  startMusic(){this.musicOn=true;if(this.ctx&&!this.nextBar)this.nextBar=this.ctx.currentTime+.2;},
- sched(){if(!this.ctx||!this.musicOn||META.set.music<=0)return;const c=this.ctx;
+ sched(){if(!this.ctx||!this.musicOn||META.set.music<=0)return;const c=this.ctx;if(this.nextBar<c.currentTime-8)this.nextBar=c.currentTime+.2;
   while(this.nextBar<c.currentTime+1.5){
    const chords=[[57,64,69,72],[53,60,65,69],[48,55,60,64],[55,62,67,71]];const ch=chords[this.bar%4];const t=this.nextBar,len=8;
    ch.forEach((m,i)=>{const f=440*Math.pow(2,(m-69)/12);[0,4].forEach(dt=>{const o=c.createOscillator(),g=c.createGain(),lp=c.createBiquadFilter();o.type='sawtooth';o.frequency.value=f*(1+(dt?.003:-.003));lp.type='lowpass';lp.frequency.value=700;
@@ -728,17 +751,17 @@ const MONET={TEST:true,dg:null,det:{},
  /* v48 : l'achat n'est consommé que si la récompense est bien sauvegardée (sinon retour à l'état d'avant, et Google Play le rendra au prochain lancement) */
  grant(id,token){if(!token)return false;META.tok=META.tok||[];if(META.tok.includes(token))return 'dup';const p=PRODUCTS.find(z=>z.id===id);if(!p)return false;
   let bS=null,bM=null;try{bS=JSON.stringify(S);bM=JSON.stringify(META);}catch(e){}
-  try{p.give();}catch(e){}META.tok.push(token);if(META.tok.length>300)META.tok=META.tok.slice(-300);
-  if(save())return true;
+  try{p.give();}catch(e){}META.tok.push(token);META.ph=(META.ph||[]).concat([{i:id,t:Date.now()}]).slice(-60);if(META.tok.length>300)META.tok=META.tok.slice(-300);
+  if(save()){if(META.ph.length===1)setTimeout(()=>backupNudge('achat'),2500);return true;}
   try{if(bS)S=JSON.parse(bS);if(bM){const o=JSON.parse(bM);for(const k of Object.keys(META))delete META[k];Object.assign(META,o);}}catch(e){}
   return false;},
  async restore(silent){if(!this.dg){if(!silent)toast(_t('Achats restaurés ✓'));return;}
   try{const ps=await this.dg.listPurchases();for(const pu of ps){const g=this.grant(pu.itemId,pu.purchaseToken);if(g&&!PERM_IDS.includes(pu.itemId))try{await this.dg.consume(pu.purchaseToken);}catch(e){}}if(ps.length)try{renderHub();}catch(e){}if(!silent)toast(_t('Achats restaurés ✓'));}catch(e){if(!silent)toast(_t('Paiement indisponible pour le moment. Réessaie plus tard.'));}},
- async pay(prod){try{const req=new PaymentRequest([{supportedMethods:'https://play.google.com/billing',data:{sku:prod.id}}],{total:{label:'Total',amount:{currency:'EUR',value:'0'}}});
+ async pay(prod){this.paying=true;setTimeout(()=>{this.paying=false;},120000);try{const req=new PaymentRequest([{supportedMethods:'https://play.google.com/billing',data:{sku:prod.id}}],{total:{label:'Total',amount:{currency:'EUR',value:'0'}}});
    const res=await req.show();const token=res.details&&res.details.purchaseToken;
    if(token){const g=this.grant(prod.id,token);if(g){AU.buy();renderHub();toast(_t('Achat réussi ✓'));if(!PERM_IDS.includes(prod.id))try{await this.dg.consume(token);}catch(e){}}else toast(_t('Achat reçu mais pas encore enregistré : il sera ajouté au prochain lancement.'));}
-   await res.complete(token?'success':'fail');}
-  catch(e){this.err='PR:'+((e&&(e.name+' '+(e.message||'')).slice(0,60))||'?');toast(e&&e.name==='AbortError'?_t('Paiement annulé'):_t('Paiement indisponible pour le moment. Réessaie plus tard.')+' ['+this.err+']');}},
+   await res.complete(token?'success':'fail');this.paying=false;}
+  catch(e){this.paying=false;this.err='PR:'+((e&&(e.name+' '+(e.message||'')).slice(0,60))||'?');toast(e&&e.name==='AbortError'?_t('Paiement annulé'):_t('Paiement indisponible pour le moment. Réessaie plus tard.')+' ['+this.err+']');}},
  rewarded(label,cb){if(adFree()){cb();return;}const o=$('adov');$('adtxt').textContent=label;o.classList.add('show');let n=3;$('adcount').textContent=n;
   const iv=setInterval(()=>{n--;$('adcount').textContent=n;if(n<=0){clearInterval(iv);o.classList.remove('show');cb();}},1000);},
  buy(prod,cb){if(this.dg){if(!this.det[prod.id]){toast(_t('Bientôt disponible'));return;}this.pay(prod);return;}
@@ -1326,6 +1349,9 @@ function steerDir(px,py,tx,ty){let dx=tx-px,dy=ty-py;const D=Math.hypot(dx,dy)||
 function updReturn(dt){const r=run.ret;r.t+=dt;const dx=SHIP.x+.55-player.x,dy=SHIP.y+1.55-player.y,d=Math.hypot(dx,dy);
   if(!r.in){const sp=Math.max(3.5,r.d0/1.2)*dt;if(d>.06){const st=Math.min(sp,d);player.x+=dx/d*st;player.y+=dy/d*st;player.moving=true;const sdx=dx-dy;if(Math.abs(sdx)>.05)player.face=sdx>0?1:-1;run.stepT-=dt;if(run.stepT<=0){run.stepT=.18;AU.step();}}else{r.in=1;player.moving=false;AU.tone(300,.35,'sine',.12,700);}}
   else{player.alpha=Math.max(0,player.alpha-dt*2.6);if(player.alpha<=0&&!r.shown){r.shown=1;setTimeout(()=>run&&run.showSum&&run.showSum(),250);}}}
+/* B1.04 ChatGPT : roche la plus proche en un seul passage (sans tri à chaque frappe en chaîne) */
+function nearestLiveOre(ores,from,done){let best,bd=Infinity;for(let i=0;i<ores.length;i++){if(!(i in ores))continue;const z=ores[i];if(z.dead||(done&&done.has(z)))continue;const d=Math.hypot(z.x-from.x,z.y-from.y);
+  if(!Number.isFinite(d))return ores.filter(o=>!o.dead&&(!done||!done.has(o))).sort((a,b)=>Math.hypot(a.x-from.x,a.y-from.y)-Math.hypot(b.x-from.x,b.y-from.y))[0];if(d<bd){bd=d;best=z;}}return best;}
 function doStrike(o){
   const tool=curTool(),dmg=ST.dmg();
   if(o&&o.mon){if(tool.beam)fxs.push({type:'beam',x:player.x,y:player.y,x2:o.x,y2:o.y,life:.18,c:tool.beam});hitMon(o,dmg);shake=Math.max(shake,2);return;}
@@ -1335,7 +1361,7 @@ function doStrike(o){
   if(L('zone')){const R=zoneR();run.ores.filter(n=>n!==o&&!n.dead&&Math.hypot(n.x-o.x,n.y-o.y)<R).sort((a,b)=>Math.hypot(a.x-o.x,a.y-o.y)-Math.hypot(b.x-o.x,b.y-o.y)).slice(0,L('zone')).forEach(n=>{fxs.push({type:'dust',x:o.x,y:o.y,x2:n.x,y2:n.y,life:.3});hitOre(n,dmg,'zone');});}
   if(!tool.aoe&&L('onde')&&Math.random()<.08*L('onde')){fxs.push({type:'ring',x:o.x,y:o.y,r:0,c:'255,230,140'});for(const n of run.ores)if(n!==o&&!n.dead&&Math.hypot(n.x-o.x,n.y-o.y)<1.6)hitOre(n,dmg*.5,'aoe');}
   if(tool.aoe){fxs.push({type:'ring',x:o.x,y:o.y,r:0,c:'111,227,255'});for(const n of run.ores)if(n!==o&&!n.dead&&Math.hypot(n.x-o.x,n.y-o.y)<1.6)hitOre(n,dmg*.5,'aoe');}
-  if(tool.chain){let from=o;const done=new Set([o]);for(let i=0;i<tool.chain;i++){const n=run.ores.filter(z=>!z.dead&&!done.has(z)).sort((a,b)=>Math.hypot(a.x-from.x,a.y-from.y)-Math.hypot(b.x-from.x,b.y-from.y))[0];if(!n||Math.hypot(n.x-from.x,n.y-from.y)>3)break;done.add(n);fxs.push({type:'bolt',x:from.x,y:from.y,x2:n.x,y2:n.y,life:.3,c:'255,120,240'});hitOre(n,dmg*.4,'chain');from=n;}}
+  if(tool.chain){let from=o;const done=new Set([o]);for(let i=0;i<tool.chain;i++){const n=nearestLiveOre(run.ores,from,done);if(!n||Math.hypot(n.x-from.x,n.y-from.y)>3)break;done.add(n);fxs.push({type:'bolt',x:from.x,y:from.y,x2:n.x,y2:n.y,life:.3,c:'255,120,240'});hitOre(n,dmg*.4,'chain');from=n;}}
   shake=Math.max(shake,1.5);
 }
 function updHud(){
@@ -1347,14 +1373,14 @@ function updHud(){
   if(run.boss){$('bossFill').style.width=Math.max(0,run.boss.hp/run.boss.max*100)+'%';$('bossHp').textContent=run.boss.dead?'VAINCU !':fmt(Math.max(0,run.boss.hp))+' PV';}
   {const ld=runLoad(),cm=capMax();$('gain').dataset.cap='🎒 '+fmt(ld)+'/'+fmt(cm);}$('gain').innerHTML='<span class="chip" style="'+(runLoad()>=capMax()*.9?'border-color:#ff6b6b;color:#ff9a9a':'')+'">'+$('gain').dataset.cap+'</span>'+(run.carry&&!run.carry.ok?'<span class="chip" style="border-color:#ffd23f">💎 → 🚀</span>':'')+Object.keys(run.gain).map(r=>'<span class="chip">'+gemHTML(r)+'+'+fmt(run.gain[r])+'</span>').join('')+(run.stars?'<span class="chip">⭐ +'+run.stars+'</span>':'');
 }
-function endRun(){
+function endRun(){try{localStorage.removeItem(KEY+'_run');}catch(e){}
   if(run.carry&&!run.carry.ok&&!run.lost){lumiPend('lumi_fail');for(const k in run.gain)run.gain[k]=Math.floor(run.gain[k]*.7);run.loot.push(_t('💔 Le minerai exceptionnel est perdu… et 30 % du butin avec lui.'));$('hint').textContent='';}
-  NEXTCARD=null;run.done=true;holding=false;$('vign').style.opacity=0;
+  NEXTCARD=null;run.done=true;holding=false;if(S.runs+1===15||(S.runs+1)%100===0)backupNudge('runs');$('vign').style.opacity=0;
   for(const r in run.gain)S.inv[r]=(S.inv[r]||0)+run.gain[r];run.starsRaw=run.stars;run.stars=freeStars(run.stars);S.runs++;if(S.runs===3&&!META.notifAsk&&('Notification' in window)&&Notification.permission==='default'&&MONET.inApp&&MONET.inApp()){META.notifAsk=1;enqueue(()=>modal('<div style="font-size:40px">🔔</div><div class="nm">'+_t('Veux-tu que LUMI te prévienne quand une récompense spéciale t’attend ?')+'</div>',[[_t('Plus tard'),()=>{}],[_t('Oui'),()=>{try{Notification.requestPermission();}catch(e){}}]]));}if(run.tuto){S.tuto='end';const te=$('tuto');if(te)te.className='';}
   if(S.lastBuyRun===undefined)S.lastBuyRun=S.runs;
   try{helpNoBuy();}catch(e){console.warn(e);}
   if(!isVisit()&&!run.deep&&S.runs>=6&&!affordable()&&S.runs-S.lastBuyRun>=4&&S.runs-(S.pityRun||0)>=6){S.pityRun=S.runs;S.boost=Math.max(Date.now(),S.boost||0)+10*60000;run.loot.unshift('🤖 '+_t('LUMI : on piétine un peu… J’ai recalibré les capteurs : butin ×2 pendant 10 min, offert. On avance ensemble !'));}
-  const tot=Object.values(run.gain).reduce((a,b)=>a+b,0);S.recs=S.recs||{};{const R0=S.recs[S.planet]||{tot:0,combo:0};run.tot=tot;run.recPrev=R0.tot;run.record=!run.lost&&tot>R0.tot&&R0.tot>0;run.comboRec=(run.bestCombo||0)>R0.combo&&R0.combo>=6;if(!run.lost)S.recs[S.planet]={tot:Math.max(R0.tot,tot),combo:Math.max(R0.combo,run.bestCombo||0)};}S.stats.best=Math.max(S.stats.best,tot);run.near=run.ores.some(o=>!o.dead&&!o.boss&&o.hp<o.max*.35);if(run.record){AU.loot&&AU.loot();}questRun(tot);$('bombBtn').style.display='none';
+  const tot=Object.values(run.gain).reduce((a,b)=>a+b,0);S.recs=S.recs||{};{const R0=S.recs[S.planet]||{tot:0,combo:0};run.tot=tot;run.recPrev=R0.tot;run.record=!run.lost&&tot>R0.tot&&R0.tot>0;if(run.record&&!isVisit())S.recPend=S.planet;run.comboRec=(run.bestCombo||0)>R0.combo&&R0.combo>=6;if(!run.lost)S.recs[S.planet]={tot:Math.max(R0.tot,tot),combo:Math.max(R0.combo,run.bestCombo||0)};}S.stats.best=Math.max(S.stats.best,tot);run.near=run.ores.some(o=>!o.dead&&!o.boss&&o.hp<o.max*.35);if(run.record){AU.loot&&AU.loot();}questRun(tot);$('bombBtn').style.display='none';
   try{afterRun();}catch(e){console.warn(e);}
   passAdd(10);if(run.card){const c=CARDS.find(z=>z.id===run.card);if(c)run.loot.unshift(c.i+_t(' Carte jouée : ')+_t(c.n));}save();
   // l'astronaute rentre dans l’ORION, puis le bilan s'affiche
@@ -1408,6 +1434,8 @@ window.addEventListener('pointercancel',()=>{holding=false;});
    ===================================================================== */
 let lastT=performance.now(),T=0,cine=null;
 function lightCtx(){const sc=GFX.q>1?.4:.25,w=Math.max(1,Math.ceil(W*sc)),h=Math.max(1,Math.ceil(H*sc));if(!GFX.lc||GFX.lc.width!==w||GFX.lc.height!==h){GFX.lc=document.createElement('canvas');GFX.lc.width=w;GFX.lc.height=h;GFX.lx=GFX.lc.getContext('2d');}return GFX.lx;}
+/* B1.09 ChatGPT : couleur du halo des minerais calculée une fois par minerai */
+const oreGlowCache=new WeakMap();function oreGlowStop(ore,g){let c=oreGlowCache.get(ore);if(!c||c.color!==ore.c||c.glow!==g){c={color:ore.c,glow:g,stop:'rgba('+h2r(ore.c)+','+(.35*g)+')'};oreGlowCache.set(ore,c);}return c.stop;}
 function drawLights(pl,t){const p=PL(),lx=lightCtx(),sc=GFX.q>1?.4:.25,LW=GFX.lc.width,LH=GFX.lc.height;
   const amb=Math.min(.8,p.amb*(mode==='run'?1.12:1)),tint=h2r(p.sky[0]).map(v=>Math.round(v*.6));
   lx.globalCompositeOperation='source-over';lx.clearRect(0,0,LW,LH);lx.fillStyle='rgba('+tint+','+amb+')';lx.fillRect(0,0,LW,LH);
@@ -1425,8 +1453,8 @@ function drawLights(pl,t){const p=PL(),lx=lightCtx(),sc=GFX.q>1?.4:.25,LW=GFX.lc
   if(WORLD.wreck&&inView(WORLD.wreck.x,WORLD.wreck.y,TW*2)){const q=iso(WORLD.wreck.x,WORLD.wreck.y,TH);L2(q[0],q[1],TW*1.3,.55);}
   for(const f of fxs){if(f.type==='zap'||f.type==='sky'){const q=iso(f.x2!==undefined?f.x2:f.x,f.y2!==undefined?f.y2:f.y,TH);L2(q[0],q[1],TW*2.2,clamp(f.life*3,0,1));}else if(f.type==='beam'){const q=iso(f.x2,f.y2,TH);L2(q[0],q[1],TW*1.2,clamp(f.life*5,0,1));}else if(f.type==='ring'&&f.big&&f.r>=0){const q=iso(f.x,f.y);L2(q[0],q[1],TW*3,clamp(1-f.r,0,1));}}
   lx.globalCompositeOperation='source-over';
-  {const hz=h2r(p.sky[1]);const hg=lx.createLinearGradient(0,0,0,LH*.3);hg.addColorStop(0,'rgba('+hz+',.42)');hg.addColorStop(1,'rgba('+hz+',0)');lx.fillStyle=hg;lx.fillRect(0,0,LW,LH*.3);
-   const rg=lx.createRadialGradient(LW/2,LH*.55,Math.min(LW,LH)*.38,LW/2,LH*.55,Math.max(LW,LH)*.78);rg.addColorStop(0,'rgba(0,0,0,0)');rg.addColorStop(1,'rgba(0,0,0,.6)');lx.fillStyle=rg;lx.fillRect(0,0,LW,LH);}
+  /* B1 ChatGPT : brume et vignette créées une seule fois (recréées seulement si taille, contexte ou ciel changent) */
+  {let c=GFX.lightStatic;const sky=p.sky[1];if(!c||c.ctx!==lx||c.w!==LW||c.h!==LH||c.sky!==sky){const hz=h2r(sky);const hg=lx.createLinearGradient(0,0,0,LH*.3);hg.addColorStop(0,'rgba('+hz+',.42)');hg.addColorStop(1,'rgba('+hz+',0)');const rg=lx.createRadialGradient(LW/2,LH*.55,Math.min(LW,LH)*.38,LW/2,LH*.55,Math.max(LW,LH)*.78);rg.addColorStop(0,'rgba(0,0,0,0)');rg.addColorStop(1,'rgba(0,0,0,.6)');c=GFX.lightStatic={ctx:lx,w:LW,h:LH,sky,hg,rg};}lx.fillStyle=c.hg;lx.fillRect(0,0,LW,LH*.3);lx.fillStyle=c.rg;lx.fillRect(0,0,LW,LH);}
   cx.drawImage(GFX.lc,-2,-2,W+4,H+4);}
 function newMote(init){const p=PL(),fl=p.flora,x=cam.x+rnd(-8,8),y=cam.y+rnd(-8,8);
   if(fl==='rod')return{x,y,z:init?rnd(0,170):rnd(150,190),vx:.8,vy:.3,vz:-rnd(120,170),life:3,k:'rain'};
@@ -1495,7 +1523,7 @@ function frameInner(now){
   drawLights(pl,T);
   // lumières émises (minerais lumineux, lave)
   cx.globalCompositeOperation='lighter';
-  if(run)for(const o of run.ores){const g=ORES[o.type].glow;if(o.dead||!g||!inView(o.x,o.y,TW))continue;const s=iso(o.x,o.y,TH*.7);const rr=TW*.7*(.85+.15*Math.sin(T*3+o.seed*9));const gg=cx.createRadialGradient(s[0],s[1],1,s[0],s[1],rr);const c=h2r(ORES[o.type].c);gg.addColorStop(0,'rgba('+c+','+(.35*g)+')');gg.addColorStop(1,'rgba(0,0,0,0)');cx.fillStyle=gg;cx.beginPath();cx.arc(s[0],s[1],rr,0,7);cx.fill();}
+  if(run)for(const o of run.ores){const g=ORES[o.type].glow;if(o.dead||!g||!inView(o.x,o.y,TW))continue;const s=iso(o.x,o.y,TH*.7);const rr=TW*.7*(.85+.15*Math.sin(T*3+o.seed*9));const gg=cx.createRadialGradient(s[0],s[1],1,s[0],s[1],rr);gg.addColorStop(0,oreGlowStop(ORES[o.type],g));gg.addColorStop(1,'rgba(0,0,0,0)');cx.fillStyle=gg;cx.beginPath();cx.arc(s[0],s[1],rr,0,7);cx.fill();}
   for(const o of run?run.ores:[])if(o.pure&&!o.dead&&inView(o.x,o.y,TW)){const s=iso(o.x,o.y,TH*.6);const gg=cx.createRadialGradient(s[0],s[1],1,s[0],s[1],TW*.5);gg.addColorStop(0,'rgba(255,255,220,.25)');gg.addColorStop(1,'rgba(0,0,0,0)');cx.fillStyle=gg;cx.beginPath();cx.arc(s[0],s[1],TW*.5,0,7);cx.fill();}
   cx.globalCompositeOperation='source-over';
   drawShots(T);
@@ -1878,12 +1906,29 @@ function openSettings(){
     _t('<div class="set"><span>🧑‍🚀 Prénom : <b>')+esc(HERO())+_t('</b></span><button class="btn s" style="padding:6px 10px" onclick="askName((v,sx)=>{S.name=v;S.sex=sx;applyGender();save();toast(\'Bienvenue à bord, \'+v+\' !\');})">Changer</button></div>')+
     _t('<div class="set"><span>🎬 Revoir l’introduction</span><button class="btn s" style="padding:6px 10px" onclick="$(\'modal\').classList.remove(\'show\');const back=mode==\'menu\'?\'menu\':\'hub\';playCine(\'intro\',()=>setMode(back));">Voir</button></div>')+
     _t('<div class="mu" style="text-align:left;margin-top:10px">💾 Code de sauvegarde (pour changer d’appareil)</div><textarea id="saveTxt"></textarea>')+
-    _t('<div class="row"><button class="btn s" style="padding:6px 10px" onclick="expSave()">Copier</button><button class="btn s" style="padding:6px 10px" onclick="impSave()">Importer</button></div>')+'<div class="row"><button class="btn s" style="padding:6px 10px" onclick="fileSave()">📁 '+_t('Enregistrer un fichier')+'</button><button class="btn s" style="padding:6px 10px" onclick="fileLoad()">📂 '+_t('Charger un fichier')+'</button></div><div class="mu" style="text-align:left">'+(META.lastBackup?_t('Dernière sauvegarde : ')+new Date(META.lastBackup).toLocaleDateString():_t('Aucune sauvegarde de secours pour l’instant.'))+'</div>',
+    '<div class="set"><span>🩺 '+_t('Signaler un problème')+'</span><button class="btn s" style="padding:6px 10px" onclick="diagReport()">'+_t('Préparer')+'</button></div>'+'<div class="set"><span>📤 '+_t('Partager mon code de sauvegarde')+'</span><button class="btn s" style="padding:6px 10px" onclick="shareSave()">'+_t('Partager')+'</button></div>'+'<div class="set"><span>🧾 '+_t('Mes achats')+'</span><button class="btn s" style="padding:6px 10px" onclick="showPurchases()">'+_t('Voir')+'</button></div>'+_t('<div class="row"><button class="btn s" style="padding:6px 10px" onclick="expSave()">Copier</button><button class="btn s" style="padding:6px 10px" onclick="impSave()">Importer</button></div>')+'<div class="row"><button class="btn s" style="padding:6px 10px" onclick="fileSave()">📁 '+_t('Enregistrer un fichier')+'</button><button class="btn s" style="padding:6px 10px" onclick="fileLoad()">📂 '+_t('Charger un fichier')+'</button></div><div class="mu" style="text-align:left">'+(META.lastBackup?_t('Dernière sauvegarde : ')+new Date(META.lastBackup).toLocaleDateString():_t('Aucune sauvegarde de secours pour l’instant.'))+'</div>',
     [[_t('Fermer'),()=>save()]]);
 }
 function saveCode(){save();return btoa(unescape(encodeURIComponent(JSON.stringify({S,META}))));}
 function fileSave(){try{const t=saveCode(),a=document.createElement('a');a.href=URL.createObjectURL(new Blob([t],{type:'text/plain'}));a.download='castaway-miner-'+new Date().toISOString().slice(0,10)+'.txt';document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},500);META.lastBackup=Date.now();save();toast('💾 '+_t('Sauvegarde enregistrée'));}catch(e){toast(_t('Impossible d’enregistrer le fichier'));}}
 function fileLoad(){const i=document.createElement('input');i.type='file';i.accept='.txt,text/plain';i.onchange=()=>{const f=i.files&&i.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{$('saveTxt').value=String(r.result||'');impSave();};r.readAsText(f);};i.click();}
+/* v49 « Confiance » : protéger sa partie (changement de téléphone, données effacées) */
+function saveCode(){save();return btoa(unescape(encodeURIComponent(JSON.stringify({S,META}))));}
+function shareSave(){const t=saveCode();META.bkLast=Date.now();save();try{const el=$('saveTxt');if(el)el.value=t;}catch(e){}
+  const txt=_t('Mon code de sauvegarde Castaway Miner (à garder précieusement) :')+'\n'+t;
+  if(navigator.share){navigator.share({title:'Castaway Miner',text:txt}).then(()=>toast(_t('Code partagé ✓'))).catch(()=>{});return;}
+  try{navigator.clipboard.writeText(t).then(()=>toast(_t('Code copié')),()=>toast(_t('Code généré : copie-le')));}catch(e){toast(_t('Code généré : copie-le'));}}
+function backupNudge(why){try{if(!S||Date.now()-(META.bkAsk||0)<7*864e5)return;META.bkAsk=Date.now();save();
+  enqueue(()=>modal('<div style="font-size:40px">💾</div><div class="nm">'+_t('Protège ta partie')+'</div><p class="mu">'+_t('Garde ton code de sauvegarde en lieu sûr (mail, notes). Si tu changes de téléphone ou effaces tes données, il te permettra de tout récupérer.')+'</p>',[[_t('Plus tard'),()=>{}],[_t('Partager mon code'),()=>shareSave()]]));}catch(e){}}
+function diagReport(){DIAG.flush(true);const ev=DIAG.list();let v='';try{v=(document.querySelector('meta[name=cm-version]')||{}).content||'';}catch(e){}
+  const lines=['Castaway Miner '+(v||'')+' · '+(typeof LANG!=='undefined'?LANG:'')+' · '+(navigator.userAgent.match(/Android [\d.]+/)||['web'])[0]];
+  ev.forEach(x=>lines.push(x.c+(x.t?' '+x.t:'')+(x.w?' @'+x.w:'')+' ['+x.m+']'+(x.n>1?' ×'+x.n:'')));if(!ev.length)lines.push(_t('Aucune erreur enregistrée.'));
+  const txt=lines.join('\n');const box=document.createElement('pre');box.style.cssText='text-align:left;white-space:pre-wrap;font-size:11px;max-height:40vh;overflow:auto;background:#0004;padding:8px;border-radius:8px';box.textContent=txt;
+  modal('<div style="font-size:38px">🩺</div><div class="nm">'+_t('Signaler un problème')+'</div><p class="mu">'+_t('Ce rapport contient seulement des codes techniques, sans tes données. Rien n’est envoyé sans toi.')+'</p><div id="diagBox"></div>',[[_t('Fermer'),null,'s'],[_t('Partager'),()=>{if(navigator.share)navigator.share({title:'Castaway Miner',text:txt}).catch(()=>{});else try{navigator.clipboard.writeText(txt).then(()=>toast(_t('Code copié')));}catch(e){}}]]);
+  setTimeout(()=>{const b=document.getElementById('diagBox');if(b)b.appendChild(box);},0);}
+function showPurchases(){const L=(META.ph||[]).slice().reverse();const dt=t=>{try{return new Date(t).toLocaleDateString();}catch(e){return '';}};
+  const rows=L.length?L.map(x=>{const p=PRODUCTS.find(z=>z.id===x.i);return '<div class="set"><span>'+(p?(p.ic||'🛒')+' '+p.n:x.i)+'</span><span class="mu">'+dt(x.t)+' · ✓ '+_t('reçu')+'</span></div>';}).join(''):'<p class="mu">'+_t('Aucun achat pour le moment.')+'</p>';
+  modal('<div style="font-size:38px">🧾</div><div class="nm">'+_t('Mes achats')+'</div>'+rows+'<p class="mu" style="font-size:12px">'+_t('Un achat manquant ? « Restaurer mes achats » le récupère auprès de Google Play.')+'</p>',[[_t('Fermer'),null,'s'],[_t('Restaurer mes achats'),()=>MONET.restore(false)]]);}
 function expSave(){save();const t=btoa(unescape(encodeURIComponent(JSON.stringify({S,META}))));$('saveTxt').value=t;try{navigator.clipboard.writeText(t).then(()=>toast(_t('Code copié')),()=>toast(_t('Code généré : copie-le')));}catch(e){toast(_t('Code généré : copie-le'));}}
 /* v48 : import vérifié avant de remplacer la partie ; en cas d'échec, la partie en cours est remise telle quelle */
 function impSave(){let d=null;try{d=JSON.parse(decodeURIComponent(escape(atob($('saveTxt').value.trim()))));}catch(e){}
@@ -2035,7 +2080,12 @@ function renderShip(){fondTick();
 const PART_MULT=[.7,3.9,6.6,12,9,14.6,34,84,113,194];
 function partLast2(pt){for(const P of PLANETS){const a=P.parts||[],i=a.indexOf(pt);if(i>=0)return i>=a.length-2;}return false;}
 function partCost(pt){if(pt.story==='radio')return Object.assign({},pt.r);const m=PART_MULT[Math.min(HOMEP(),PART_MULT.length-1)]*(pt.n===_t('Carburant')||pt.n===_t('Navigation')?2:1)*(partLast2(pt)?2:1),c={};for(const k in pt.r)c[k]=Math.round(pt.r[k]*m/5)*5||pt.r[k];return c;}
-function repairKit(i){const A=ACC();const pt=PL().parts[i];if(isVisit()||A.rep<=0||S.parts.includes(i))return;A.rep--;S.parts.push(i);AU.buy();vib(30);toast('🧰 '+pt.i+' '+pt.n);save();renderHub();}
+function repairKit(i){const A=ACC();const pt=PL().parts[i];if(isVisit()||A.rep<=0||S.parts.includes(i))return;A.rep--;S.parts.push(i);AU.buy();vib(30);toast('🧰 '+pt.i+' '+pt.n);
+  /* D5 ChatGPT : un module réparé avec un kit débloque l'histoire comme une réparation normale (radio, écran) */
+  if(pt.story){S.story[pt.story]=true;lumiSay(pt.story==='radio'?_t('La radio fonctionne ! Je capte… quelque chose. Un signal de la Terre !'):_t('L’écran s’allume ! Si quelqu’un nous envoie une vidéo, on pourra la voir.'));}
+  save();renderHub();checkStory();setTimeout(pump,400);}
+/* D5 : réparation des sauvegardes déjà touchées (module d'histoire réparé avec un kit) */
+function storyHeal(){try{if(!S||!S.story)return;let ch=false;for(let p=0;p<PLANETS.length;p++){const P=PLANETS[p];(P.parts||[]).forEach((pt,i)=>{if(!pt.story||S.story[pt.story])return;if(p<S.planet||(p===S.planet&&(S.parts||[]).includes(i))){S.story[pt.story]=true;ch=true;}});}if(ch)save();}catch(e){}}
 function repair(i){if(isVisit())return;const pt=PL().parts[i];if(S.parts.includes(i)||!canPay(partCost(pt)))return;pay(partCost(pt));S.parts.push(i);if(!pt.story)lumiPend('lumi_rep');AU.buy();vib(30);toast(pt.i+' '+pt.n+_t(' réparé !'));if(pt.story){S.story[pt.story]=true;lumiSay(pt.story==='radio'?_t('La radio fonctionne ! Je capte… quelque chose. Un signal de la Terre !'):_t('L’écran s’allume ! Si quelqu’un nous envoie une vidéo, on pourra la voir.'));}else lumiSay(pick([_t('Un module de plus ! L’ORION reprend des couleurs.'),_t('Excellent travail, Capitaine. Encore ')+(PL().parts.length-S.parts.length)+_t(' et on décolle.'),_t('Je sens les vibrations du vaisseau… il veut repartir, lui aussi.')]));save();renderHub();checkStory();setTimeout(pump,400);}
 function launch(){if(isVisit())return;
   const last=S.planet>=PLANETS.length-1;
@@ -2212,8 +2262,13 @@ function catchUp(){
   if(fresh0)enqueue(welcomeShow);
   renderHub();
 }
-document.addEventListener('visibilitychange',()=>{if(document.hidden){save();}else if(S&&mode==='hub')catchUp();});
+function runPend(){try{if(typeof mode!=='undefined'&&mode==='run'&&run&&!run.done&&!run.lost&&Object.keys(run.gain).length)localStorage.setItem(KEY+'_run',JSON.stringify({g:run.gain,p:S.planet,n:S.runs,t:Date.now()}));}catch(e){}}
+setInterval(runPend,8000);window.addEventListener('pagehide',runPend);
+document.addEventListener('visibilitychange',()=>{if(document.hidden){runPend();save();save.frozen=true;}else{save.frozen=false;if(S&&mode==='hub')catchUp();}});
 window.addEventListener('pagehide',save);
+/* v49 : demande au navigateur de ne jamais effacer la sauvegarde quand le téléphone manque de place */
+try{if(navigator.storage&&navigator.storage.persist)navigator.storage.persisted().then(p=>{if(!p)navigator.storage.persist().catch(()=>{});}).catch(()=>{});}catch(e){}
+
 window.addEventListener('resize',resize);
 setInterval(()=>{if(S&&mode!=='run'&&mode!=='cine')save();},6000);
 
@@ -2364,7 +2419,11 @@ const WRECK_LOGS=[
 let lumiTimer=null;
 let lumiLast=0;
 function lumiSay(txt,dur){lumiLast=Date.now();const e=$('lumi');if(!e)return;$('lumiTxt').textContent=txt;e.classList.add('show');clearTimeout(lumiTimer);lumiTimer=setTimeout(()=>e.classList.remove('show'),dur||6500);lumi.say=1.5;}
+/* v49 D2 ChatGPT : 60 répliques de LUMI par planète (conseils, humour, records), sans nouveau minuteur */
+const LUMI2=[[0, "tip", "Sur Kepra-7, commence près de l’ORION."], [0, "tip", "La Force aide à briser les premiers rochers."], [0, "humor", "La poussière rouge est gratuite. Le nettoyage aussi, apparemment."], [0, "humor", "Mon filtre à poussière réclame des vacances."], [0, "record", "Un nouveau record dans ce désert rouge ! Bravo, Capitaine."], [0, "record", "Record battu. La rouille n’a pas eu le dernier mot."], [1, "tip", "Sur Vortha, prévois le ralentissement dû au froid."], [1, "tip", "La combinaison thermique aide à résister au froid."], [1, "humor", "Je n’ai pas de nez. Avantage certain sur Vortha."], [1, "humor", "Mes circuits préfèrent les couvertures aux glaçons."], [1, "record", "Record battu malgré le froid de Vortha !"], [1, "record", "Ce nouveau record mérite un chocolat chaud."], [2, "tip", "Sur Nyx Prime, la lampe frontale facilite l’exploration."], [2, "tip", "Garde de l’oxygène pour explorer la forêt sombre."], [2, "humor", "Ces champignons brillent mieux que mon voyant de batterie."], [2, "humor", "La forêt a le sens de l’éclairage. Je prends des notes."], [2, "record", "Un nouveau record sous les lueurs de Nyx Prime !"], [2, "record", "Ton record brille plus fort que ces spores."], [3, "tip", "Sur Solara, la chaleur accélère la consommation d’oxygène."], [3, "tip", "Les semelles anti-gravité permettent de franchir la lave."], [3, "humor", "Solara : excellent endroit pour griller des toasts. Mauvais pour moi."], [3, "humor", "Je préfère mes circuits froids et mes blagues chaudes."], [3, "record", "Nouveau record sur Solara. Même la lave s’incline !"], [3, "record", "Capitaine, ce record est brûlant !"], [4, "tip", "Sur Abyssia, méfie-toi des anomalies de gravité."], [4, "tip", "Prévois tes déplacements près du vide."], [4, "humor", "Le trou noir ne répond jamais à mes messages."], [4, "humor", "Je vais éviter les blagues trop lourdes ici."], [4, "record", "Record battu sur Abyssia. Le vide ne nous arrête pas."], [4, "record", "Un nouveau record, même au bord du néant !"], [5, "tip", "Sur Aquaris, le sable humide ralentit tes pas."], [5, "tip", "Avant la sortie, vérifie la capacité de ton sac."], [5, "humor", "L’océan est violet. Mon manuel ne m’avait pas prévenu."], [5, "humor", "Les crabes ont des pinces. Moi, j’ai des arguments."], [5, "record", "Record battu sur Aquaris ! Voilà une belle marée de minerais."], [5, "record", "Ce record est une perle rare, Capitaine."], [6, "tip", "Sur Sylvane, les spores augmentent la consommation d’oxygène."], [6, "tip", "La serre de l’ORION peut améliorer ta réserve d’oxygène."], [6, "humor", "Cette jungle pousse plus vite que ma liste de tâches."], [6, "humor", "Une fougère géante. Enfin quelqu’un de plus encombrant que moi."], [6, "record", "Nouveau record sur Sylvane. Tu as la main verte !"], [6, "record", "Ce record a de solides racines !"], [7, "tip", "Sur Cristallia, la lumière des cristaux réduit la visibilité."], [7, "tip", "Les géodes peuvent rapporter davantage de minerais."], [7, "humor", "Tant de reflets ! Je viens de me saluer trois fois."], [7, "humor", "Cristallia devrait ouvrir une boutique de lunettes de soleil."], [7, "record", "Record battu sur Cristallia ! C’est du diamant pur."], [7, "record", "Un record aux mille facettes. Magnifique !"], [8, "tip", "Sur Tempestia, la foudre peut affaiblir ton matériel."], [8, "tip", "Le bouclier énergétique aide à résister à la foudre."], [8, "humor", "Je suis un robot. Pas un paratonnerre, merci."], [8, "humor", "Le tonnerre couvre mes blagues. Quelle chance pour toi !"], [8, "record", "Record battu sur Tempestia. Une performance électrique !"], [8, "record", "Même l’orage applaudit ton nouveau record !"], [9, "tip", "Sur Kronos, les radiations augmentent la consommation d’oxygène."], [9, "tip", "Vérifie les modules de décollage avant le dernier saut."], [9, "humor", "Tout cet or, et toujours pas de tasse de café."], [9, "humor", "J’ai répété mon discours de retour. Il est beaucoup trop long."], [9, "record", "Record battu sur Kronos ! Gardons cet élan jusqu’à la Terre."], [9, "record", "Un nouveau record et une raison de plus d’être fier de ce voyage."]];
+function lumi2(kind){try{const p=Math.max(0,PLANETS.indexOf(PL()));const L=LUMI2.filter(x=>x[0]===p&&x[1]===kind);if(!L.length)return null;let x=L[Math.floor(Math.random()*L.length)];if(L.length>1&&x[2]===lumi2.last)x=L.find(y=>y[2]!==lumi2.last);lumi2.last=x[2];return _t(x[2]);}catch(e){return null;}}
 function idleLine(){
+  try{if(S&&S.recPend!==undefined){const rp=S.recPend;delete S.recPend;if(rp===S.planet&&!S.ended){const r=lumi2('record');if(r)return r;}}if(Math.random()<.4){const r=lumi2(Math.random()<.55?'tip':'humor');if(r)return r;}}catch(e){}
   const l=[_t('Ma batterie est à 100 %. Mon optimisme aussi.'),_t('Respirez calmement dehors, Capitaine. Chaque seconde d’oxygène compte.'),
    _t('La Terre est à ')+(PLANETS.length-S.planet)+' '+plw(PLANETS.length-S.planet,'saut')+_t(' d’ici. On y arrive.'),_t('Plus on s’éloigne du vaisseau, plus les minerais sont rares… et précieux.'),
    _t('Je n’ai pas de cœur, Capitaine. Mais si j’en avais un, il battrait pour votre famille.'),_t('J’ai rangé vos outils. Enfin… je les ai regardés très fort.')];
@@ -2378,7 +2437,7 @@ function idleLine(){
   return l[Math.floor(Math.random()*l.length)];
 }
 function lumiIdle(first){if(first)setTimeout(()=>{if(mode==='hub'&&!$('modal').classList.contains('show')&&Date.now()-lumiLast>6000)lumiSay(idleLine());},1600);}
-setInterval(()=>{if(S&&mode==='hub'&&!$('modal').classList.contains('show')&&Date.now()-lumiLast>12000)lumiSay(Math.random()<.5?adviceNow():idleLine());},30000);
+setInterval(()=>{if(S&&mode==='hub'&&!document.hidden&&!$('modal').classList.contains('show')&&Date.now()-lumiLast>12000)lumiSay(Math.random()<.5?adviceNow():idleLine());},30000);
 // transmissions
 let txQueued=null,txAnim=null,txTimer=null;
 function checkStory(){if(!S)return;const m=MSGS.find(z=>!S.story.seen.includes(z.id)&&z.when());if(!m||txQueued===m.id)return;txQueued=m.id;
@@ -2662,10 +2721,10 @@ function bossDefeated(o){S.boss[S.planet]=1;try{const it=dropItem([1,1,2,2,3,3,3
   run.loot.push(_t('⭐ +15 étoiles'));shake=14;AU.boom();vib([100,50,200]);for(let i=0;i<3;i++)fxs.push({type:'ring',x:o.x,y:o.y,r:-i*.25,c:'255,200,80',big:1});
   const p=iso(o.x,o.y,TH*2);floats.push({x:p[0],y:p[1],t:0,txt:_t('👹 CŒUR VAINCU !'),c:'#ffd23f',s:22});run.t+=5;run.total+=5;}
 function lightning(o,dmg){const jumps=2+L('arc');const d2=dmg*(.6+.25*L('surtension'));let from=o;const done=new Set([o]);AU.zap();
-  for(let i=0;i<jumps;i++){const n=run.ores.filter(z=>!z.dead&&!done.has(z)).sort((a,b)=>Math.hypot(a.x-from.x,a.y-from.y)-Math.hypot(b.x-from.x,b.y-from.y))[0];if(!n||Math.hypot(n.x-from.x,n.y-from.y)>3.2)break;done.add(n);
+  for(let i=0;i<jumps;i++){const n=nearestLiveOre(run.ores,from,done);if(!n||Math.hypot(n.x-from.x,n.y-from.y)>3.2)break;done.add(n);
     fxs.push({type:'zap',x:from.x,y:from.y,x2:n.x,y2:n.y,life:.3});const f=from;setTimeout(()=>{if(run&&!run.done&&!n.dead)hitOre(n,d2,'eclair');},60*(i+1));from=n;}}
 function throwBomb(){if(!run||run.done||!run.bombs)return;let tg=target&&!target.dead?target:null;
-  if(!tg){tg=run.ores.filter(o=>!o.dead).sort((a,b)=>Math.hypot(a.x-player.x,a.y-player.y)-Math.hypot(b.x-player.x,b.y-player.y))[0];}
+  if(!tg){tg=nearestLiveOre(run.ores,player,null);}
   if(!tg){toast(_t('Aucun rocher à portée'));return;}
   run.bombs--;$('bombN').textContent=run.bombs;if(!run.bombs)$('bombBtn').style.display='none';
   const x=tg.x,y=tg.y;fxs.push({type:'tap',x,y,life:.4});AU.tone(200,.35,'sawtooth',.08,80);
@@ -3563,13 +3622,16 @@ function afterRun(){eqInit();const tot=Object.values(run.gain).reduce((a,b)=>a+b
 function openAccel(){tab='shop';shopTab='offres';full=false;$('modal').classList.remove('show');renderHub();setTimeout(()=>{const a=document.querySelector('#shop .starsg');if(a)a.scrollIntoView({behavior:'smooth'});},150);}
 function nudge(key,html){META.nudge=META.nudge||{};const d=dkey(new Date());if(META.nudge[key]===d)return;META.nudge[key]=d;save();
   enqueue(()=>modal('<div style="display:flex;gap:10px;align-items:center;text-align:left"><div style="font-size:34px">🤖</div><div>'+html+'</div></div>',[[_t('🛒 Voir les accélérateurs'),openAccel],[_t('Plus tard'),null,'s']]));}
-function notify(title,body){try{if(!META.set.notif||!('Notification' in window)||Notification.permission!=='granted')return;if(!document.hidden)return;
-  if(navigator.serviceWorker&&navigator.serviceWorker.ready)navigator.serviceWorker.ready.then(r=>r.showNotification(title,{body,icon:'icon-192.png',tag:title})).catch(()=>{new Notification(title,{body});});else new Notification(title,{body});}catch(e){}}
+/* B1.11 ChatGPT : notification seulement quand le jeu est caché, sans attendre indéfiniment le service worker */
+function canNotify(){return !!(META.set.notif&&document.hidden&&('Notification' in window)&&Notification.permission==='granted');}
+async function notify(title,body){try{if(!canNotify())return false;const sw=navigator.serviceWorker;
+  if(sw){const r=await sw.getRegistration();if(!canNotify()||!r||!r.active||typeof r.showNotification!=='function')return false;await r.showNotification(title,{body,icon:'icon-192.png',tag:title});}
+  else{if(!canNotify())return false;new Notification(title,{body});}return true;}catch(e){return false;}}
 function wipeAll(){modal('<div style="font-size:40px">🗑️</div><div class="nm" style="font-size:17px">'+_t('Effacer toutes mes données ?')+'</div><p class="mu">'+_t('Ta progression, tes étoiles, tes tenues et tes réglages seront supprimés de cet appareil. Les achats Google Play restent liés à ton compte Google et pourront être restaurés.')+'</p>',[[_t('Annuler'),null,'s'],[_t('Tout effacer'),()=>{try{localStorage.clear();}catch(e){}location.reload();},'']]);}
 function askNotif(){try{if(!('Notification' in window)){toast(_t('Notifications non disponibles sur cet appareil'));return;}Notification.requestPermission().then(p=>{META.set.notif=p==='granted';save();toast(p==='granted'?_t('🔔 Notifications activées'):_t('Notifications refusées'));openSettings();});}catch(e){}}
 let NOTI_LAST={};
 setInterval(()=>{if(!S||!META.set.notif)return;const now=Date.now();
-  const chk=(k,cond,t,b)=>{if(cond&&!NOTI_LAST[k]){NOTI_LAST[k]=1;notify(t,b);}if(!cond)NOTI_LAST[k]=0;};
+  const chk=(k,cond,t,b)=>{if(cond&&document.hidden&&!NOTI_LAST[k]){NOTI_LAST[k]=1;notify(t,b).then(ok=>{if(!ok)NOTI_LAST[k]=0;});}if(!cond)NOTI_LAST[k]=0;};
   chk('lab',S.lab&&S.lab.end<=now,_t('🔬 Analyse terminée'),_t('LUMI a fini l’analyse au Laboratoire.'));
   chk('fond',S.fond&&S.fond.q>0&&S.fond.end<=now,_t('🧱 Lingot prêt'),_t('La Fonderie a fondu un nouveau lingot.'));
   chk('exp',Object.values(S.crewMis||{}).some(m=>m.end<=now),_t('🧭 Retour d’expédition'),_t('Un équipier est rentré avec du butin.'));
@@ -3625,14 +3687,16 @@ function doPrestige(){try{albumAdd('🪐',_t('Départ de ')+PL().n+' → '+(PLAN
    12. DÉMARRAGE
    ===================================================================== */
 i18nDom(document.body);markLang();
-S=loadAll();
+S=loadAll();storyHeal();
+/* v49 : butin d'une sortie interrompue (appli fermée en pleine sortie) récupéré au lancement suivant */
+try{const pr=localStorage.getItem(KEY+'_run');if(pr){localStorage.removeItem(KEY+'_run');const d=JSON.parse(pr);if(S&&d&&d.g&&d.n===S.runs&&Date.now()-d.t<30*864e5){let n=0;for(const k in d.g){const q=Math.floor(+d.g[k]);if(q>0&&q<1e9){S.inv[k]=(S.inv[k]||0)+q;n+=q;}}if(n>0){save();setTimeout(()=>{try{toast(_t('🎒 LUMI a récupéré le butin de ta sortie interrompue : +')+fmt(n));}catch(e){}},3500);}}}}catch(e){}
 if(!S){S=fresh();}
 applyGender();ensureEco();
 genWorld();resize();setMode('menu');
 requestAnimationFrame(frame);
 MONET.init();
 </script>
-<script>if("serviceWorker" in navigator){let rl=false;navigator.serviceWorker.addEventListener("controllerchange",()=>{if(rl)return;rl=true;location.reload();});navigator.serviceWorker.register("sw.js",{updateViaCache:"none"}).then(r=>{r.update&&r.update();}).catch(()=>{});}</script>
+<script>if("serviceWorker" in navigator){let rl=false;const safeNow=()=>{try{return (mode==="hub"||mode==="menu")&&!(typeof MONET!=="undefined"&&MONET.paying)&&!document.querySelector(".modal.show")&&!(typeof QUEUE!=="undefined"&&QUEUE.length);}catch(e){return true;}};const doReload=()=>{if(rl)return;rl=true;try{save();}catch(e){}location.reload();};navigator.serviceWorker.addEventListener("controllerchange",()=>{if(safeNow()){doReload();return;}const iv=setInterval(()=>{if(safeNow()){clearInterval(iv);doReload();}},2000);});navigator.serviceWorker.register("sw.js",{updateViaCache:"none"}).then(r=>{r.update&&r.update();}).catch(()=>{});}</script>
 <script src="cinematiques/cinematiques-hd.js"></script>
 <script src="real/realiste.js"></script>
 </body>
